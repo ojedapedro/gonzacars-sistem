@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock } from 'lucide-react';
+import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Purchase, Product } from '../types';
 
 interface TemporaryItem {
@@ -36,7 +36,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
   // Filtros para el historial
   const [filters, setFilters] = useState({
     provider: '',
-    category: '',
+    status: 'Todas' as 'Todas' | 'Pendiente' | 'Cerrada',
     dateStart: '',
     dateEnd: ''
   });
@@ -101,15 +101,14 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
     if (status === 'Cerrada') setActiveTab('history');
   };
 
-  // Filtrado de Historial: Solo Compras Cerradas
+  // Filtrado de Historial Avanzado
   const filteredPurchases = useMemo(() => {
     return store.purchases.filter((p: Purchase) => {
-      const isClosed = p.status === 'Cerrada';
+      const matchStatus = filters.status === 'Todas' || p.status === filters.status;
       const matchProvider = !filters.provider || p.provider.toLowerCase().includes(filters.provider.toLowerCase());
-      const matchCategory = !filters.category || p.category.toLowerCase().includes(filters.category.toLowerCase());
       const matchDateStart = !filters.dateStart || p.date >= filters.dateStart;
       const matchDateEnd = !filters.dateEnd || p.date <= filters.dateEnd;
-      return isClosed && matchProvider && matchCategory && matchDateStart && matchDateEnd;
+      return matchStatus && matchProvider && matchDateStart && matchDateEnd;
     }).sort((a: Purchase, b: Purchase) => b.date.localeCompare(a.date));
   }, [store.purchases, filters]);
 
@@ -134,7 +133,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
             onClick={() => setActiveTab('history')}
             className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
           >
-            Historial Cerrado
+            Historial de Facturas
           </button>
         </div>
       </div>
@@ -176,7 +175,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                 <Package size={16} className="text-blue-500" /> Carga de Productos
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                <div className="md:col-span-5 space-y-1.5">
+                <div className="md:col-span-4 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Repuesto</label>
                   <input type="text" placeholder="Bujías NGK..." className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" value={currentItem.productName} onChange={(e) => setCurrentItem({...currentItem, productName: e.target.value})} />
                 </div>
@@ -191,9 +190,9 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Costo ($)</label>
                   <input type="number" step="0.01" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none" value={currentItem.price || ''} onChange={(e) => setCurrentItem({...currentItem, price: Number(e.target.value)})} />
                 </div>
-                <div className="md:col-span-1 space-y-1.5">
+                <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cant.</label>
-                  <input type="number" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none" value={currentItem.quantity || ''} onChange={(e) => setCurrentItem({...currentItem, quantity: Number(e.target.value)})} />
+                  <input type="number" className="w-full px-2 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none text-center" value={currentItem.quantity || ''} onChange={(e) => setCurrentItem({...currentItem, quantity: Number(e.target.value)})} />
                 </div>
                 <div className="md:col-span-1">
                   <button onClick={addItemToInvoice} className="w-full h-[46px] bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
@@ -286,7 +285,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
         </div>
       ) : (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-          {/* Filtros Historial */}
+          {/* Filtros Historial Avanzados */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[200px] space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Proveedor</label>
@@ -301,6 +300,18 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                 />
               </div>
             </div>
+            <div className="w-48 space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado Factura</label>
+              <select 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black uppercase outline-none cursor-pointer"
+                value={filters.status}
+                onChange={(e) => setFilters({...filters, status: e.target.value as any})}
+              >
+                <option value="Todas">Ver Todas</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="Cerrada">Cerradas / Procesadas</option>
+              </select>
+            </div>
             <div className="w-44 space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Desde</label>
               <input type="date" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none" value={filters.dateStart} onChange={(e) => setFilters({...filters, dateStart: e.target.value})} />
@@ -310,23 +321,24 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
               <input type="date" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none" value={filters.dateEnd} onChange={(e) => setFilters({...filters, dateEnd: e.target.value})} />
             </div>
             <button 
-              onClick={() => setFilters({ provider: '', category: '', dateStart: '', dateEnd: '' })}
+              onClick={() => setFilters({ provider: '', status: 'Todas', dateStart: '', dateEnd: '' })}
               className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-colors"
+              title="Limpiar filtros"
             >
               <Filter size={18}/>
             </button>
           </div>
 
-          {/* Listado de Compras Cerradas */}
+          {/* Listado de Compras */}
           <div className="flex-1 overflow-y-auto bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Factura</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Factura / Fecha</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Proveedor</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Producto</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Cant.</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Costo ($)</th>
                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total ($)</th>
                 </tr>
               </thead>
@@ -340,6 +352,15 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                     <td className="px-8 py-5">
                       <span className="font-bold text-slate-700 uppercase text-xs">{p.provider}</span>
                     </td>
+                    <td className="px-8 py-5 text-center">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter border ${
+                        p.status === 'Cerrada' 
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+                          : 'bg-amber-100 text-amber-700 border-amber-200'
+                      }`}>
+                        {p.status}
+                      </span>
+                    </td>
                     <td className="px-8 py-5">
                       <p className="text-slate-900 font-bold text-xs uppercase">{p.productName}</p>
                       <p className="text-[9px] font-black text-blue-500 uppercase tracking-tighter">{p.category}</p>
@@ -347,13 +368,19 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                     <td className="px-8 py-5 text-center">
                       <span className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black">{p.quantity}</span>
                     </td>
-                    <td className="px-8 py-5 text-right font-bold text-slate-500 text-sm">${p.price.toFixed(2)}</td>
-                    <td className="px-8 py-5 text-right font-black text-blue-600 text-lg">${p.total.toFixed(2)}</td>
+                    <td className="px-8 py-5 text-right font-black text-blue-600 text-lg">
+                      ${p.total.toFixed(2)}
+                    </td>
                   </tr>
                 ))}
                 {filteredPurchases.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-8 py-20 text-center opacity-30 italic font-bold">No hay facturas cerradas registradas</td>
+                    <td colSpan={6} className="px-8 py-20 text-center">
+                      <div className="flex flex-col items-center opacity-30">
+                        <AlertCircle size={48} className="mb-2" />
+                        <p className="italic font-bold">No se encontraron facturas con los filtros aplicados</p>
+                      </div>
+                    </td>
                   </tr>
                 )}
               </tbody>
