@@ -58,12 +58,55 @@ export const useGonzacarsStore = () => {
       
       if (data.Users) setUsers(data.Users);
       if (data.Customers) setCustomers(data.Customers);
-      if (data.Inventory) setInventory(data.Inventory);
-      if (data.Repairs) setRepairs(data.Repairs);
-      if (data.Sales) setSales(data.Sales);
-      if (data.Purchases) setPurchases(data.Purchases);
-      if (data.Expenses) setExpenses(data.Expenses);
-      if (data.Employees) setEmployees(data.Employees);
+      
+      if (data.Inventory) {
+        setInventory(data.Inventory.map((p: any) => ({
+          ...p,
+          quantity: Number(p.quantity || 0),
+          cost: Number(p.cost || 0),
+          price: Number(p.price || 0)
+        })));
+      }
+      
+      if (data.Repairs) {
+        setRepairs(data.Repairs.map((r: any) => ({
+          ...r,
+          items: (r.items || []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) })),
+          installments: (r.installments || []).map((inst: any) => ({ ...inst, amount: Number(inst.amount || 0) }))
+        })));
+      }
+      
+      if (data.Sales) {
+        setSales(data.Sales.map((s: any) => ({
+          ...s,
+          total: Number(s.total || 0),
+          items: (s.items || []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) }))
+        })));
+      }
+      
+      if (data.Purchases) {
+        setPurchases(data.Purchases.map((p: any) => ({
+          ...p,
+          price: Number(p.price || 0),
+          quantity: Number(p.quantity || 0),
+          total: Number(p.total || 0)
+        })));
+      }
+      
+      if (data.Expenses) {
+        setExpenses(data.Expenses.map((e: any) => ({
+          ...e,
+          amount: Number(e.amount || 0)
+        })));
+      }
+      
+      if (data.Employees) {
+        setEmployees(data.Employees.map((e: any) => ({
+          ...e,
+          baseSalary: Number(e.baseSalary || 0),
+          commissionRate: Number(e.commissionRate || 0)
+        })));
+      }
       
       const rateSetting = data.Settings?.find((s: any) => s.key === 'exchangeRate');
       if (rateSetting) setExchangeRate(Number(rateSetting.value));

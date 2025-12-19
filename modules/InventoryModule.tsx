@@ -119,7 +119,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                     {p.quantity <= 5 && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
                   </div>
                 </td>
-                <td className="px-8 py-5 text-right font-bold text-slate-400 text-sm">${p.cost.toFixed(2)}</td>
+                <td className="px-8 py-5 text-right font-bold text-slate-400 text-sm">${Number(p.cost || 0).toFixed(2)}</td>
                 <td className="px-8 py-5 text-right">
                   {editingId === p.id ? (
                     <input 
@@ -133,7 +133,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                       onKeyDown={(e) => e.key === 'Enter' && handlePriceUpdate(p.id)}
                     />
                   ) : (
-                    <span className="font-black text-blue-600 text-lg tracking-tighter">${p.price.toFixed(2)}</span>
+                    <span className="font-black text-blue-600 text-lg tracking-tighter">${Number(p.price || 0).toFixed(2)}</span>
                   )}
                 </td>
                 <td className="px-8 py-5">
@@ -210,11 +210,11 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Unidades Compradas</p>
-                          <p className="text-3xl font-black text-slate-900 tracking-tighter">{history.reduce((acc, h) => acc + h.quantity, 0)}</p>
+                          <p className="text-3xl font-black text-slate-900 tracking-tighter">{history.reduce((acc, h) => acc + Number(h.quantity || 0), 0)}</p>
                        </div>
                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ultimo Costo Registrado</p>
-                          <p className="text-3xl font-black text-emerald-600 tracking-tighter">${history[0].price.toFixed(2)}</p>
+                          <p className="text-3xl font-black text-emerald-600 tracking-tighter">${Number(history[0].price || 0).toFixed(2)}</p>
                        </div>
                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Veces Abastecido</p>
@@ -252,10 +252,10 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                                 <span className="text-xs font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-full">{h.quantity}</span>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <span className="text-xs font-black text-slate-500">${h.price.toFixed(2)}</span>
+                                <span className="text-xs font-black text-slate-500">${Number(h.price || 0).toFixed(2)}</span>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <span className="text-sm font-black text-emerald-600">${h.total.toFixed(2)}</span>
+                                <span className="text-sm font-black text-emerald-600">${Number(h.total || 0).toFixed(2)}</span>
                               </td>
                             </tr>
                           ))}
