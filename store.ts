@@ -27,7 +27,6 @@ export const useGonzacarsStore = () => {
   };
 
   const login = (username: string, pass: string): boolean => {
-    // Si no hay usuarios cargados aún (primera vez), permitir admin/admin si la lista está vacía
     if (users.length === 0 && username === 'admin' && pass === 'admin') {
        const adminUser: User = { id: 'default', username: 'admin', name: 'Administrador Base', role: 'administrador' };
        setCurrentUser(adminUser);
@@ -80,7 +79,7 @@ export const useGonzacarsStore = () => {
     refreshData();
   }, [sheetsUrl]);
 
-  const syncRow = async (sheet: string, action: 'add' | 'update', data: any) => {
+  const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete', data: any) => {
     if (!sheetsUrl) return;
     try {
       await fetch(sheetsUrl, {
@@ -91,6 +90,21 @@ export const useGonzacarsStore = () => {
     } catch (e) {
       console.error("Error sincronizando:", e);
     }
+  };
+
+  const addUser = (user: User) => {
+    setUsers(prev => [...prev, user]);
+    syncRow('Users', 'add', user);
+  };
+
+  const updateUser = (updated: User) => {
+    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+    syncRow('Users', 'update', updated);
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers(prev => prev.filter(u => u.id !== id));
+    syncRow('Users', 'delete', { id });
   };
 
   const updateExchangeRate = (val: number) => {
@@ -199,6 +213,7 @@ export const useGonzacarsStore = () => {
   return {
     loading, sheetsUrl, saveUrl, refreshData,
     currentUser, login, logout,
+    users, addUser, updateUser, deleteUser,
     exchangeRate, setExchangeRate: updateExchangeRate,
     customers, addCustomer,
     inventory, setInventory, updateInventoryPrice, updateInventoryQuantity, updateBarcode, 

@@ -18,7 +18,8 @@ import {
   ExternalLink,
   Lock,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { useGonzacarsStore } from './store';
 import RepairRegistration from './modules/RepairRegistration';
@@ -30,6 +31,7 @@ import FinanceModule from './modules/FinanceModule';
 import ExpenseModule from './modules/ExpenseModule';
 import PayrollModule from './modules/PayrollModule';
 import CustomerModule from './modules/CustomerModule';
+import UserManagement from './modules/UserManagement';
 
 const App: React.FC = () => {
   const store = useGonzacarsStore();
@@ -151,6 +153,7 @@ const App: React.FC = () => {
       case 'finance': return <FinanceModule store={store} />;
       case 'expenses': return <ExpenseModule store={store} />;
       case 'payroll': return <PayrollModule store={store} />;
+      case 'user-mgmt': return <UserManagement store={store} />;
       default: return (
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex justify-between items-center">
@@ -268,6 +271,7 @@ const App: React.FC = () => {
           <NavItem icon={<BarChart3 size={20}/>} label="Finanzas" active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} visible={hasPermission('finance')} />
           <NavItem icon={<Wallet size={20}/>} label="Gastos" active={activeTab === 'expenses'} onClick={() => setActiveTab('expenses')} visible={hasPermission('expenses')} />
           <NavItem icon={<Users size={20}/>} label="Nómina" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} visible={hasPermission('payroll')} />
+          <NavItem icon={<ShieldCheck size={20}/>} label="Usuarios" active={activeTab === 'user-mgmt'} onClick={() => setActiveTab('user-mgmt')} visible={hasPermission('user-mgmt')} />
         </nav>
 
         <div className="p-6 border-t border-white/5 space-y-4 bg-slate-900/50 backdrop-blur-md">
@@ -275,7 +279,7 @@ const App: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-black">
               {store.currentUser?.name.charAt(0)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-0">
               <p className="text-[10px] font-black uppercase text-white tracking-tight truncate">{store.currentUser?.name}</p>
               <p className="text-[8px] font-black uppercase text-blue-500 tracking-[0.2em]">{store.currentUser?.role}</p>
             </div>

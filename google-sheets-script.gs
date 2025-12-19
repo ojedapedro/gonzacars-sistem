@@ -102,6 +102,15 @@ function doPost(e) {
       }
     }
   }
+  else if (action === 'delete') {
+    const idIndex = headers.indexOf('id');
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][idIndex] === payload.data.id) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
+    }
+  }
 
   return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
 }
