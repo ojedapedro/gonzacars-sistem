@@ -214,14 +214,6 @@ const App: React.FC = () => {
                       >
                           Vincular y Guardar
                       </button>
-                      <a 
-                          href="https://docs.google.com/spreadsheets/d/1L-Fmfey-8ZR6vgF5DVR6B5fiSLbVYo7YDs7pIuBxmEU" 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="flex items-center gap-2 text-blue-600 font-black uppercase text-[10px] tracking-widest hover:underline px-4"
-                      >
-                          Explorar Sheet <ExternalLink size={14}/>
-                      </a>
                   </div>
               </div>
 
