@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Camera, Save, Sparkles, Loader2 } from 'lucide-react';
+import { Camera, Save, Sparkles, Loader2, ClipboardCheck, X } from 'lucide-react';
 import { VehicleRepair, ServiceStatus, Customer } from '../types';
 import { improveDiagnosis } from '../lib/gemini';
 
@@ -26,6 +26,17 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     }
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, evidencePhoto: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerId) {
@@ -42,15 +53,6 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     store.addRepair(newRepair);
     alert('Vehículo registrado correctamente');
     setFormData({ status: 'Ingresado', year: new Date().getFullYear(), items: [] });
-  };
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setFormData({ ...formData, evidencePhoto: reader.result as string });
-      reader.readAsDataURL(file);
-    }
   };
 
   return (
@@ -87,6 +89,18 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
               </div>
             ))}
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Estado de Entrada</label>
+              <select 
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-600 bg-blue-50/30"
+                value={formData.status} 
+                onChange={(e) => setFormData({...formData, status: e.target.value as ServiceStatus})}
+              >
+                {['Ingresado', 'En Diagnóstico', 'En Reparación', 'Esperando Repuestos', 'Finalizado', 'Entregado'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Mecánico Asignado</label>
               <select required className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.mechanicId || ''} onChange={(e) => setFormData({...formData, mechanicId: e.target.value})}>
@@ -95,6 +109,34 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Evidencia Fotográfica (Opcional)</label>
+            <div className="flex items-center gap-4">
+              {!formData.evidencePhoto ? (
+                <label className="cursor-pointer flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-slate-400 hover:text-blue-500">
+                  <Camera size={28} />
+                  <span className="text-[10px] font-black uppercase tracking-widest mt-2">Subir Foto</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              ) : (
+                <div className="relative group">
+                  <img src={formData.evidencePhoto} className="w-32 h-32 object-cover rounded-xl border border-slate-200 shadow-sm" />
+                  <button 
+                    type="button"
+                    onClick={() => setFormData({...formData, evidencePhoto: undefined})}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-all"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              <div className="flex-1 text-xs text-slate-500">
+                <p className="font-bold">Recomendación:</p>
+                <p>Capture una foto de la parte frontal o del área específica a reparar para mayor respaldo.</p>
+              </div>
             </div>
           </div>
 
