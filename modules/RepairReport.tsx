@@ -16,19 +16,23 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
 
   const handleSearch = () => {
-    const plateRegex = /^[A-Z]{3}-\d{3,4}$/i;
+    // Nueva validación flexible: Solo texto y números
+    const plateRegex = /^[A-Z0-9]+$/i;
     
     if (!searchPlate.trim()) {
       alert('Por favor ingrese una placa');
       return;
     }
 
-    if (!plateRegex.test(searchPlate)) {
-      alert('Formato de placa inválido. Use el formato AAA-123 (ej: ABC-123)');
+    if (!plateRegex.test(searchPlate.replace(/\s/g, ''))) {
+      alert('La placa debe contener solo letras y números (ej: PED123OJ)');
       return;
     }
 
-    const found = store.repairs.find((r: VehicleRepair) => r.plate.toUpperCase() === searchPlate.toUpperCase());
+    const found = store.repairs.find((r: VehicleRepair) => 
+      r.plate.toUpperCase().replace(/\s/g, '') === searchPlate.toUpperCase().replace(/\s/g, '')
+    );
+
     if (found) {
       setCurrentRepair({ ...found });
       if (found.paymentMethod) setTempPaymentMethod(found.paymentMethod);
@@ -132,7 +136,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     if (!currentRepair) return;
     const balance = calculateBalance();
     
-    // Si hay saldo, registrarlo como el último abono automático al marcar como entregado
     let updatedInstallments = [...(currentRepair.installments || [])];
     if (balance > 0) {
       updatedInstallments.push({
@@ -155,7 +158,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     setCurrentRepair(updated);
     setShowPayModal(false);
     
-    // Generar la venta para el inventario
     store.addSale({
       id: Math.random().toString(36).substr(2, 9).toUpperCase(),
       customerId: currentRepair.customerId,
@@ -196,13 +198,12 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
   return (
     <div className="p-8">
-      {/* Search Header */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 flex gap-4 no-print">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
           <input 
             type="text" 
-            placeholder="Ingrese Placa (ej: ABC-123)" 
+            placeholder="Ingrese Placa (ej: PED123OJ)" 
             className="w-full pl-10 pr-4 py-2 border rounded-lg uppercase outline-none focus:ring-2 focus:ring-blue-500 font-bold"
             value={searchPlate}
             onChange={(e) => setSearchPlate(e.target.value)}
@@ -216,7 +217,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {currentRepair ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Header */}
           <div className="p-8 bg-slate-900 text-white flex justify-between items-start">
             <div>
               <div className="flex flex-wrap items-center gap-4 mb-2">
@@ -247,7 +247,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
           <div className="p-8 space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Diagnosis */}
               <div className="lg:col-span-7 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                   <ClipboardList size={16} /> Diagnóstico Técnico
@@ -255,7 +254,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <p className="text-slate-700 italic leading-relaxed font-medium">"{currentRepair.diagnosis}"</p>
               </div>
 
-              {/* Photos */}
               {currentRepair.evidencePhotos && currentRepair.evidencePhotos.length > 0 && (
                 <div className="lg:col-span-5 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                   <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -277,7 +275,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               )}
             </div>
 
-            {/* Items */}
             <div>
               <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print">
                 <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 uppercase tracking-tighter">Detalle de Cargos</h3>
@@ -356,7 +353,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
             </div>
 
-            {/* SECCIÓN DE ABONOS */}
             <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200">
                <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -387,7 +383,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                     )}
                   </div>
 
-                  {/* Resumen de Caja en Informe */}
                   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-50 pb-3">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Presupuesto</span>
@@ -412,7 +407,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                </div>
             </div>
 
-            {/* Totals Section Principal */}
             <div className="flex flex-col items-end gap-2 bg-slate-900 text-white p-8 rounded-[2.5rem]">
               <div className="flex justify-between w-72 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-white/10 pb-3 mb-1">
                 <span>Total General</span>
@@ -433,7 +427,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               <p className="text-[10px] font-bold text-slate-500 uppercase mt-2 italic">Tasa: {store.exchangeRate} Bs/$ ({(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs)</p>
             </div>
 
-            {/* Actions */}
             <div className="flex flex-wrap gap-4 pt-8 no-print border-t border-slate-100">
               <button onClick={() => window.print()} className="flex-1 min-w-[200px] border-2 border-slate-200 py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
                 <Printer size={18}/> Imprimir Informe
@@ -471,7 +464,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* Abono Modal */}
       {showAbonoModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10">
@@ -510,7 +502,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* Inventory Search Modal */}
       {showInventorySearch && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[80vh]">
@@ -553,7 +544,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* Confirmation Final Modal */}
       {showPayModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
