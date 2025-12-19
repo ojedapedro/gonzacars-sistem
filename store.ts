@@ -1,14 +1,16 @@
 
 import { useState, useEffect } from 'react';
-import { Product, VehicleRepair, Sale, Purchase, Expense, Employee, PayrollRecord, Customer } from './types';
+import { Product, VehicleRepair, Sale, Purchase, Expense, Employee, PayrollRecord, Customer, User } from './types';
 
-// NOTA: El usuario debe colocar su URL de Web App desplegada aquí o en la UI
 const DEFAULT_SHEETS_URL = localStorage.getItem('gz_sheets_url') || '';
+const STORED_USER = localStorage.getItem('gz_active_user');
 
 export const useGonzacarsStore = () => {
   const [loading, setLoading] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState(DEFAULT_SHEETS_URL);
+  const [currentUser, setCurrentUser] = useState<User | null>(STORED_USER ? JSON.parse(STORED_USER) : null);
   
+  const [users, setUsers] = useState<User[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(45.0);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [inventory, setInventory] = useState<Product[]>([]);
@@ -24,7 +26,30 @@ export const useGonzacarsStore = () => {
     setSheetsUrl(url);
   };
 
-  // Cargar datos iniciales desde Google Sheets
+  const login = (username: string, pass: string): boolean => {
+    // Si no hay usuarios cargados aún (primera vez), permitir admin/admin si la lista está vacía
+    if (users.length === 0 && username === 'admin' && pass === 'admin') {
+       const adminUser: User = { id: 'default', username: 'admin', name: 'Administrador Base', role: 'administrador' };
+       setCurrentUser(adminUser);
+       localStorage.setItem('gz_active_user', JSON.stringify(adminUser));
+       return true;
+    }
+
+    const found = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === pass);
+    if (found) {
+      const { password, ...userWithoutPass } = found;
+      setCurrentUser(userWithoutPass as User);
+      localStorage.setItem('gz_active_user', JSON.stringify(userWithoutPass));
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('gz_active_user');
+  };
+
   const refreshData = async () => {
     if (!sheetsUrl) return;
     setLoading(true);
@@ -32,6 +57,7 @@ export const useGonzacarsStore = () => {
       const response = await fetch(sheetsUrl);
       const data = await response.json();
       
+      if (data.Users) setUsers(data.Users);
       if (data.Customers) setCustomers(data.Customers);
       if (data.Inventory) setInventory(data.Inventory);
       if (data.Repairs) setRepairs(data.Repairs);
@@ -91,7 +117,6 @@ export const useGonzacarsStore = () => {
     setSales(prev => [...prev, sale]);
     syncRow('Sales', 'add', sale);
     
-    // Deducción local y en nube de inventario
     const updatedInventory = inventory.map(item => {
       const soldItem = sale.items.find(si => si.productId === item.id);
       if (soldItem) {
@@ -173,6 +198,7 @@ export const useGonzacarsStore = () => {
 
   return {
     loading, sheetsUrl, saveUrl, refreshData,
+    currentUser, login, logout,
     exchangeRate, setExchangeRate: updateExchangeRate,
     customers, addCustomer,
     inventory, setInventory, updateInventoryPrice, updateInventoryQuantity, updateBarcode, 
