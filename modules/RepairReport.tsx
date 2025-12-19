@@ -323,48 +323,48 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </div>
               </div>
 
-              <div className="overflow-hidden border border-slate-200 rounded-[2.5rem] shadow-sm bg-white">
+              <div className="overflow-hidden border-2 border-slate-900 rounded-[2.5rem] shadow-2xl bg-white">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="text-left bg-slate-50 border-b-2 border-slate-100">
-                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest">Categoría</th>
-                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest">Descripción del Item</th>
-                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-center">Cant.</th>
-                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-right">Precio ($)</th>
-                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-right">Subtotal</th>
+                    <tr className="text-left bg-slate-900 text-white">
+                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-[0.2em] border-r border-slate-800">Categoría</th>
+                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-[0.2em] border-r border-slate-800">Descripción del Item</th>
+                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-[0.2em] text-center border-r border-slate-800">Cant.</th>
+                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-[0.2em] text-right border-r border-slate-800">Precio ($)</th>
+                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-[0.2em] text-right">Subtotal</th>
                       <th className="px-8 py-6 no-print"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-200">
                     {currentRepair.items.map(item => (
-                      <tr key={item.id} className="group hover:bg-blue-50/30 transition-all border-l-4 border-transparent hover:border-blue-500 even:bg-slate-50/30">
+                      <tr key={item.id} className="group hover:bg-blue-50/50 transition-all border-l-8 border-transparent hover:border-blue-600 even:bg-slate-50/50">
                         <td className="px-8 py-6">
-                          <span className={`text-[9px] px-3 py-1.5 rounded-full font-black uppercase shadow-sm border ${
-                            item.type === 'Repuesto' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                            item.type === 'Consumible' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-purple-100 text-purple-700 border-purple-200'
+                          <span className={`text-[9px] px-3 py-1.5 rounded-full font-black uppercase shadow-sm border-2 ${
+                            item.type === 'Repuesto' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            item.type === 'Consumible' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
                           }`}>{item.type}</span>
                         </td>
                         <td className="px-8 py-6">
                           <input 
                             type="text" 
-                            className="w-full bg-slate-100/50 border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-4 py-2 rounded-xl transition-all font-bold text-slate-800 outline-none uppercase text-sm"
+                            className="w-full bg-transparent border-b-2 border-transparent group-hover:border-blue-200 focus:border-blue-500 px-0 py-2 transition-all font-bold text-slate-800 outline-none uppercase text-sm"
                             value={item.description}
                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                           />
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex items-center justify-center gap-3">
-                            <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="no-print p-2 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"><Minus size={12}/></button>
-                            <span className="font-black text-slate-900 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm min-w-[44px] text-center text-sm">{item.quantity}</span>
-                            <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="no-print p-2 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"><Plus size={12}/></button>
+                            <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="no-print p-2 hover:bg-blue-600 hover:text-white rounded-lg transition-all border border-slate-200"><Minus size={12}/></button>
+                            <span className="font-black text-slate-900 text-sm min-w-[30px] text-center">{item.quantity}</span>
+                            <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="no-print p-2 hover:bg-blue-600 hover:text-white rounded-lg transition-all border border-slate-200"><Plus size={12}/></button>
                           </div>
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <span className="text-slate-400 text-xs font-bold">$</span>
+                            <span className="text-slate-400 font-black">$</span>
                             <input 
                               type="number" 
-                              className="w-24 text-right bg-slate-100/50 border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-4 py-2 rounded-xl transition-all font-black text-sm"
+                              className="w-24 text-right bg-transparent border-b-2 border-transparent group-hover:border-blue-200 focus:border-blue-500 px-0 py-2 transition-all font-black text-sm"
                               value={item.price}
                               onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
                             />
@@ -374,15 +374,15 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                           <span className="font-black text-slate-900 text-base tracking-tighter">${(item.price * item.quantity).toFixed(2)}</span>
                         </td>
                         <td className="px-8 py-6 text-right no-print">
-                          <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500 hover:bg-white p-2.5 rounded-xl transition-all border border-transparent hover:border-red-100">
-                            <Trash2 size={18}/>
+                          <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500 p-2.5 rounded-xl transition-all hover:bg-red-50">
+                            <Trash2 size={20}/>
                           </button>
                         </td>
                       </tr>
                     ))}
                     {currentRepair.items.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-8 py-24 text-center text-slate-400 font-black uppercase tracking-widest text-xs italic">La orden de reparación no contiene cargos registrados</td>
+                        <td colSpan={6} className="px-8 py-24 text-center text-slate-300 font-black uppercase tracking-[0.3em] text-xs italic">La orden de reparación no contiene cargos registrados</td>
                       </tr>
                     )}
                   </tbody>
@@ -394,13 +394,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                {/* Historial de Pagos (Lado Izquierdo) */}
                <div className="lg:col-span-7 space-y-6">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                         <History size={18} className="text-blue-600" /> Historial de Pagos / Abonos
                      </h3>
                      <button 
                         onClick={() => setShowAbonoModal(true)}
-                        className="no-print px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        className="no-print px-6 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
                      >
                         + Registrar Abono
                      </button>
@@ -409,35 +409,31 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   <div className="space-y-4">
                     {currentRepair.installments && currentRepair.installments.length > 0 ? (
                       currentRepair.installments.map((inst, idx) => (
-                        <div key={inst.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm relative group hover:border-blue-200 transition-all">
+                        <div key={inst.id} className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 flex justify-between items-center shadow-sm hover:border-blue-600 transition-all group">
                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 font-black text-xs">
+                              <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm group-hover:bg-blue-600 transition-colors">
                                  {idx + 1}
                               </div>
                               <div>
-                                 <div className="flex items-center gap-2 mb-0.5">
-                                    <CalendarDays size={12} className="text-blue-500" />
+                                 <div className="flex items-center gap-2 mb-1">
+                                    <CalendarDays size={14} className="text-blue-500" />
                                     <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
                                        {new Date(inst.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                                     </p>
-                                    <Clock size={12} className="text-slate-300 ml-1" />
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">
-                                       {new Date(inst.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
                                  </div>
-                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Método: <span className="text-slate-800">{inst.method}</span></p>
+                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Vía: <span className="text-slate-900">{inst.method}</span></p>
                               </div>
                            </div>
                            <div className="text-right">
-                              <p className="text-xl font-black text-emerald-600 tracking-tighter">+ ${Number(inst.amount).toFixed(2)}</p>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase italic">Recibo de Caja OK</p>
+                              <p className="text-2xl font-black text-emerald-600 tracking-tighter">+ ${Number(inst.amount).toFixed(2)}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase italic">Confirmado</p>
                            </div>
                         </div>
                       ))
                     ) : (
-                      <div className="py-12 text-center bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
-                         <DollarSign size={32} className="mx-auto text-slate-200 mb-2" />
-                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">No se han registrado pagos parciales</p>
+                      <div className="py-16 text-center bg-slate-50 rounded-[2.5rem] border-4 border-dotted border-slate-200">
+                         <DollarSign size={40} className="mx-auto text-slate-300 mb-3" />
+                         <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Esperando pagos del cliente</p>
                       </div>
                     )}
                   </div>
@@ -445,37 +441,37 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
                {/* Resumen de Cuenta (Lado Derecho) */}
                <div className="lg:col-span-5">
-                  <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
-                    <DollarSign className="absolute -bottom-10 -right-10 text-white/5" size={200} />
-                    <div className="relative z-10 space-y-6">
+                  <div className="bg-slate-950 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden border-4 border-slate-800">
+                    <DollarSign className="absolute -bottom-10 -right-10 text-white/5" size={250} />
+                    <div className="relative z-10 space-y-8">
                       <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Total Presupuestado</p>
-                        <h3 className="text-4xl font-black tracking-tighter">${calculateTotal().toFixed(2)}</h3>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-3">Total Presupuestado</p>
+                        <h3 className="text-5xl font-black tracking-tighter">${calculateTotal().toFixed(2)}</h3>
                       </div>
 
-                      <div className="pt-6 border-t border-white/10 space-y-4">
+                      <div className="space-y-4 pt-6 border-t border-white/10">
                         <div className="flex justify-between items-center text-emerald-400">
-                          <span className="text-[10px] font-black uppercase tracking-widest">Total Abonado</span>
-                          <span className="text-xl font-black tracking-tight">${calculatePaid().toFixed(2)}</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Pagos Acumulados</span>
+                          <span className="text-2xl font-black tracking-tight">${calculatePaid().toFixed(2)}</span>
                         </div>
                         
-                        <div className="flex justify-between items-center pt-4 border-t border-white/20">
+                        <div className="flex justify-between items-center pt-6 border-t border-white/20">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">Saldo Pendiente</span>
-                            <span className="text-[9px] font-bold text-slate-500 uppercase mt-1">Por liquidar</span>
+                            <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.4em]">Saldo Final</span>
+                            <span className="text-[9px] font-bold text-slate-600 uppercase mt-1">Por liquidar</span>
                           </div>
                           <div className="text-right">
-                            <span className={`text-5xl font-black tracking-tighter ${calculateBalance() > 0 ? 'text-blue-400 animate-pulse' : 'text-emerald-400'}`}>
+                            <span className={`text-6xl font-black tracking-tighter ${calculateBalance() > 0 ? 'text-blue-500' : 'text-emerald-500'}`}>
                               ${calculateBalance().toFixed(2)}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="pt-6 bg-white/5 p-6 rounded-[2rem] border border-white/10">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Referencia en Moneda Local</p>
-                        <p className="text-2xl font-black text-center tracking-tighter text-blue-300">{(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
-                        <p className="text-[8px] font-bold text-slate-500 uppercase text-center mt-1 italic">Calculado a tasa: {store.exchangeRate} Bs/$</p>
+                      <div className="pt-8 bg-blue-600/10 p-6 rounded-[2.5rem] border border-blue-500/30">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-2 text-center">Referencia Bs (Tasa: {store.exchangeRate})</p>
+                        <p className="text-3xl font-black text-center tracking-tighter text-blue-100">{(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
+                        <p className="text-[8px] font-bold text-slate-600 uppercase text-center mt-2 italic">Valor sujeto a cambio de tasa diaria</p>
                       </div>
                     </div>
                   </div>
@@ -483,17 +479,17 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
 
             {/* Acciones Finales */}
-            <div className="flex flex-wrap gap-4 pt-10 no-print border-t border-slate-100">
-              <button onClick={() => window.print()} className="flex-1 min-w-[200px] border-2 border-slate-200 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-slate-50 transition-all shadow-sm">
-                <Printer size={20}/> Imprimir Informe Completo
+            <div className="flex flex-wrap gap-4 pt-10 no-print border-t border-slate-200">
+              <button onClick={() => window.print()} className="flex-1 min-w-[200px] bg-white border-2 border-slate-900 py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-slate-50 transition-all shadow-xl">
+                <Printer size={22}/> Imprimir Informe
               </button>
               
               {currentRepair.status !== 'Entregado' && (
-                <div className="flex-1 min-w-[350px] flex gap-3">
+                <div className="flex-1 min-w-[400px] flex gap-4">
                   <div className="flex-1 relative">
-                    <Wallet size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <Wallet size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <select 
-                      className="w-full pl-12 pr-4 py-5 bg-slate-100 border-2 border-slate-100 rounded-[2rem] font-black uppercase text-[10px] tracking-widest outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                      className="w-full pl-14 pr-4 py-6 bg-slate-50 border-2 border-slate-200 rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest outline-none focus:border-blue-600 transition-all appearance-none cursor-pointer shadow-sm"
                       value={tempPaymentMethod}
                       onChange={(e) => setTempPaymentMethod(e.target.value as PaymentMethod)}
                     >
@@ -502,8 +498,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                       ))}
                     </select>
                   </div>
-                  <button onClick={() => setShowPayModal(true)} className="flex-[1.5] bg-blue-600 text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95">
-                    <CheckCircle size={20}/> {calculateBalance() > 0 ? 'Liquidar y Entregar' : 'Registrar Entrega'}
+                  <button onClick={() => setShowPayModal(true)} className="flex-[1.5] bg-blue-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95">
+                    <CheckCircle size={22}/> Finalizar y Entregar
                   </button>
                 </div>
               )}
@@ -511,55 +507,46 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-[500px] text-slate-400 border-2 border-dashed border-slate-200 rounded-[3rem] bg-white/50 animate-pulse-slow">
-          <div className="p-10 bg-slate-100 rounded-full mb-6">
-            <ClipboardList size={80} className="text-slate-300 opacity-50" />
+        <div className="flex flex-col items-center justify-center h-[600px] text-slate-400 border-4 border-dashed border-slate-200 rounded-[4rem] bg-white/50">
+          <div className="p-12 bg-slate-100 rounded-full mb-8">
+            <ClipboardList size={100} className="text-slate-300 opacity-50" />
           </div>
-          <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Buscador de Reparaciones</h4>
-          <p className="mt-2 text-slate-500 text-center font-medium max-w-sm px-6">Utilice el campo de placa arriba para localizar la reparación y gestionar abonos, cargos y entregas.</p>
+          <h4 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Consulta de Órdenes</h4>
+          <p className="mt-4 text-slate-500 text-center font-bold max-w-md px-10">Ingrese la placa del vehículo para gestionar los detalles de facturación, abonos y entrega del servicio técnico.</p>
         </div>
       )}
 
       {/* Modal de Registro de Abono */}
       {showAbonoModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full p-10 animate-in zoom-in duration-300 border border-slate-100">
-            <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center mb-8 rotate-3 shadow-xl shadow-blue-50">
-               <DollarSign size={40} />
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl max-w-md w-full p-12 animate-in zoom-in duration-300 border-4 border-slate-100">
+            <div className="w-24 h-24 bg-blue-600 text-white rounded-[2.5rem] flex items-center justify-center mb-10 rotate-3 shadow-2xl shadow-blue-200">
+               <DollarSign size={50} />
             </div>
-            <h3 className="text-3xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Registrar Abono</h3>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Pago parcial de servicio</p>
+            <h3 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Nuevo Abono</h3>
+            <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] mb-10">Abono parcial a la cuenta</p>
             
-            <div className="space-y-6">
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Monto del Abono ($)</label>
+            <div className="space-y-8">
+              <div className="space-y-3">
+                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-3">Monto en Dólares ($)</label>
                  <div className="relative">
-                    <DollarSign size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-600" />
+                    <DollarSign size={24} className="absolute left-6 top-1/2 -translate-y-1/2 text-blue-600" />
                     <input 
                       type="number" 
                       step="0.01"
-                      className="w-full pl-12 pr-6 py-5 bg-slate-50 border border-slate-100 rounded-2xl font-black text-3xl text-slate-900 outline-none focus:ring-4 focus:ring-blue-50 transition-all"
+                      className="w-full pl-14 pr-8 py-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-4xl text-slate-900 outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                       value={abonoAmount || ''}
                       onChange={(e) => setAbonoAmount(Number(e.target.value))}
                       placeholder="0.00"
                       autoFocus
                     />
                  </div>
-                 <div className="flex justify-between items-center px-2 mt-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase">Saldo Pendiente: <span className="text-blue-600 font-black">${calculateBalance().toFixed(2)}</span></p>
-                    <button 
-                       onClick={() => setAbonoAmount(calculateBalance())}
-                       className="text-[9px] font-black text-blue-500 uppercase underline decoration-2 underline-offset-4"
-                    >
-                       Pagar Todo
-                    </button>
-                 </div>
               </div>
 
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Método de Pago</label>
+              <div className="space-y-3">
+                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-3">Canal de Pago</label>
                  <select 
-                  className="w-full px-6 py-5 bg-slate-50 border border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest outline-none focus:ring-4 focus:ring-blue-50 transition-all appearance-none cursor-pointer"
+                  className="w-full px-8 py-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black uppercase text-[11px] tracking-widest outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                   value={abonoMethod}
                   onChange={(e) => setAbonoMethod(e.target.value as PaymentMethod)}
                 >
@@ -569,85 +556,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </select>
               </div>
 
-              <div className="flex gap-4 pt-6">
-                 <button onClick={() => setShowAbonoModal(false)} className="flex-1 py-5 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors">Cancelar</button>
-                 <button onClick={registerAbono} className="flex-[2] bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-95">Confirmar Abono</button>
+              <div className="flex gap-6 pt-6">
+                 <button onClick={() => setShowAbonoModal(false)} className="flex-1 py-6 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:text-red-500 transition-colors">Cancelar</button>
+                 <button onClick={registerAbono} className="flex-[2] bg-blue-600 text-white py-6 rounded-[2rem] font-black uppercase text-[11px] tracking-widest hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all">Confirmar Abono</button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Liquidación y Entrega */}
-      {showPayModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[3.5rem] shadow-2xl max-w-md w-full p-12 text-center border border-slate-100 animate-in zoom-in duration-300">
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 rotate-3 shadow-xl shadow-emerald-50">
-              <CheckCircle size={56} />
-            </div>
-            <h3 className="text-3xl font-black mb-2 text-slate-900 uppercase tracking-tighter">Cierre de Orden</h3>
-            <p className="text-slate-500 mb-8 font-medium italic leading-relaxed">
-              Se registrará la liquidación final de <span className="text-blue-600 font-black">${calculateBalance().toFixed(2)}</span> mediante <span className="font-black">{tempPaymentMethod}</span>. El vehículo se marcará como entregado y se descontará el stock.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button onClick={finalizeRepair} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all active:scale-95">
-                Confirmar Liquidación y Entrega
-              </button>
-              <button onClick={() => setShowPayModal(false)} className="w-full py-3 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-all">Regresar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Búsqueda en Inventario */}
-      {showInventorySearch && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
-            <div className="p-10 border-b border-slate-100">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Inventario de Repuestos</h3>
-                <button onClick={() => setShowInventorySearch(false)} className="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-red-500 transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20}/>
-                <input 
-                  type="text" 
-                  placeholder="Escriba nombre del repuesto..." 
-                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-bold transition-all"
-                  value={invSearchTerm}
-                  onChange={(e) => setInvSearchTerm(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-              {filteredInventory.map((p: Product) => (
-                <button 
-                  key={p.id}
-                  onClick={() => addFromInventory(p)}
-                  className="w-full p-6 flex items-center justify-between hover:bg-blue-50 rounded-[2rem] transition-all text-left group border border-transparent hover:border-blue-100"
-                >
-                  <div>
-                    <p className="font-black text-slate-900 group-hover:text-blue-700 uppercase text-base leading-tight">{p.name}</p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{p.category}</span>
-                       <span className={`text-[10px] font-black uppercase ${p.quantity <= 5 ? 'text-red-500' : 'text-emerald-600'}`}>STOCK: {p.quantity}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-blue-600 text-2xl tracking-tighter">${Number(p.price).toFixed(2)}</p>
-                    <p className="text-[10px] font-mono font-bold text-slate-300 uppercase mt-1">{p.barcode}</p>
-                  </div>
-                </button>
-              ))}
-              {filteredInventory.length === 0 && (
-                <div className="py-20 text-center text-slate-300">
-                  <Package size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="font-black uppercase tracking-widest text-xs">No se encontraron repuestos</p>
-                </div>
-              )}
             </div>
           </div>
         </div>

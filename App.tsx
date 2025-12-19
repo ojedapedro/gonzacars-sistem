@@ -17,7 +17,9 @@ import {
   Lock,
   LogOut,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  TrendingUp,
+  Coins
 } from 'lucide-react';
 import { useGonzacarsStore } from './store';
 import RepairRegistration from './modules/RepairRegistration';
@@ -37,6 +39,7 @@ const App: React.FC = () => {
   const store = useGonzacarsStore();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tempUrl, setTempUrl] = useState(store.sheetsUrl);
+  const [localRate, setLocalRate] = useState(store.exchangeRate);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +52,11 @@ const App: React.FC = () => {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 3000);
     }
+  };
+
+  const handleRateUpdate = () => {
+    store.setExchangeRate(localRate);
+    alert("Tasa de cambio actualizada correctamente");
   };
 
   const hasPermission = (tab: string) => {
@@ -163,7 +171,7 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <DashboardCard 
               title="Ventas Hoy" 
               value={`$ ${Number(store.sales.filter(s => s.date === new Date().toISOString().split('T')[0]).reduce((acc, s) => acc + Number(s.total || 0), 0)).toFixed(2)}`}
@@ -179,14 +187,51 @@ const App: React.FC = () => {
               value={store.customers.length.toString()}
               icon={<UserRound className="text-purple-500" />}
             />
+            {/* Tarjeta de Tasa de Cambio Manual */}
+            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+              <Coins className="absolute -bottom-6 -right-6 text-white/5 group-hover:scale-110 transition-transform" size={120} />
+              <div className="relative z-10">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Tasa de Cambio Manual (Bs/$)</p>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="number" 
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-2xl font-black outline-none focus:border-blue-500 transition-all"
+                    value={localRate}
+                    onChange={(e) => setLocalRate(Number(e.target.value))}
+                  />
+                  <button 
+                    onClick={handleRateUpdate}
+                    className="p-3 bg-blue-600 rounded-2xl hover:bg-blue-700 transition-all shadow-lg"
+                    title="Actualizar Tasa"
+                  >
+                    <RefreshCw size={20} />
+                  </button>
+                </div>
+                <p className="mt-4 text-[9px] font-bold text-blue-400 uppercase italic">Afecta ventas y reportes financieros</p>
+              </div>
+            </div>
           </div>
 
-          {store.currentUser?.role === 'administrador' && (
-            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm max-w-2xl relative overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
+               <div className="flex justify-between items-start mb-10">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                        <TrendingUp className="text-blue-600" size={24}/> Resumen Mensual de Operaciones
+                    </h3>
+                    <p className="text-sm text-slate-500 font-medium">Histórico de actividad reciente del taller</p>
+                  </div>
+               </div>
+               <div className="h-64 flex items-center justify-center border-2 border-dashed border-slate-100 rounded-[2rem] text-slate-300 font-black uppercase text-xs tracking-widest italic">
+                  Gráfico Estadístico en Tiempo Real
+               </div>
+            </div>
+
+            <div className="lg:col-span-4 bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
               <h3 className="text-xl font-black text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-tighter relative z-10">
-                  <Database className="text-blue-600" size={20}/> Cloud Database Config
+                  <Database className="text-blue-600" size={20}/> Cloud DB Config
               </h3>
-              <p className="text-sm text-slate-500 mb-6 font-medium relative z-10">Conecte el sistema a Google Sheets mediante la URL de implementación del Apps Script.</p>
+              <p className="text-xs text-slate-500 mb-6 font-medium relative z-10">URL de Apps Script para sincronización en la nube.</p>
               
               <div className="space-y-4 relative z-10">
                   <input 
@@ -196,17 +241,15 @@ const App: React.FC = () => {
                       value={tempUrl}
                       onChange={(e) => setTempUrl(e.target.value)}
                   />
-                  <div className="flex gap-3">
-                      <button 
-                          onClick={() => store.saveUrl(tempUrl)}
-                          className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-95"
-                      >
-                          Vincular y Guardar
-                      </button>
-                  </div>
+                  <button 
+                      onClick={() => store.saveUrl(tempUrl)}
+                      className="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-black shadow-xl shadow-slate-200 transition-all active:scale-95"
+                  >
+                      Guardar Configuración
+                  </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       );
     }
@@ -261,7 +304,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex flex-col items-end">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasa Bancaria</span>
-            <span className="text-sm font-black text-blue-600 tracking-tight">{store.exchangeRate} Bs</span>
+            <span className="text-sm font-black text-blue-600 tracking-tight">{store.exchangeRate.toFixed(2)} Bs</span>
           </div>
         </header>
         
