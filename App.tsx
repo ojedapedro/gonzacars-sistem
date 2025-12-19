@@ -119,7 +119,7 @@ const App: React.FC = () => {
               <p className="text-red-400 text-center text-xs font-black uppercase tracking-widest animate-bounce">Credenciales Inválidas</p>
             )}
 
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-blue-500/10 transition-all active:scale-95 group">
+            <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-blue-500/10 transition-all active:scale-95 group">
               Acceder al Sistema <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform"/>
             </button>
           </form>
@@ -279,7 +279,7 @@ const App: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-black">
               {store.currentUser?.name.charAt(0)}
             </div>
-            <div className="flex-1 min-0">
+            <div className="flex-1 min-w-0">
               <p className="text-[10px] font-black uppercase text-white tracking-tight truncate">{store.currentUser?.name}</p>
               <p className="text-[8px] font-black uppercase text-blue-500 tracking-[0.2em]">{store.currentUser?.role}</p>
             </div>
@@ -289,19 +289,22 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-blue-600/10 p-4 rounded-2xl text-center border border-blue-600/20">
-            <label className="block text-[9px] text-blue-400 mb-1.5 font-black uppercase tracking-widest">Tasa del día</label>
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-white font-black text-lg">{store.exchangeRate}</span>
-              <span className="text-blue-400 text-[10px] font-bold">Bs/$</span>
-            </div>
-            {store.currentUser?.role === 'administrador' && (
-              <input 
-                type="range" 
-                min="30" max="70" step="0.5"
-                value={store.exchangeRate} 
-                onChange={(e) => store.setExchangeRate(Number(e.target.value))}
-                className="w-full mt-3 h-1.5 bg-blue-900 rounded-full appearance-none cursor-pointer accent-blue-500"
-              />
+            <label className="block text-[9px] text-blue-400 mb-1.5 font-black uppercase tracking-widest">Tasa del día (Bs/$)</label>
+            {store.currentUser?.role === 'administrador' ? (
+              <div className="mt-1 flex items-center justify-center gap-2">
+                <input 
+                  type="number" 
+                  step="0.01"
+                  className="w-24 bg-white/5 border border-white/10 rounded-lg text-white font-black text-center text-lg py-1 outline-none focus:border-blue-500 transition-all"
+                  value={store.exchangeRate} 
+                  onChange={(e) => store.setExchangeRate(Number(e.target.value))}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <span className="text-white font-black text-lg">{store.exchangeRate}</span>
+                <span className="text-blue-400 text-[10px] font-bold tracking-widest uppercase">Bs/$</span>
+              </div>
             )}
           </div>
         </div>
