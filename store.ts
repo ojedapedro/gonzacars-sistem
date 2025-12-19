@@ -8,7 +8,13 @@ const STORED_USER = localStorage.getItem('gz_active_user');
 export const useGonzacarsStore = () => {
   const [loading, setLoading] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState(DEFAULT_SHEETS_URL);
-  const [currentUser, setCurrentUser] = useState<User | null>(STORED_USER ? JSON.parse(STORED_USER) : null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      return STORED_USER ? JSON.parse(STORED_USER) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   
   const [users, setUsers] = useState<User[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(45.0);
@@ -56,10 +62,10 @@ export const useGonzacarsStore = () => {
       const response = await fetch(sheetsUrl);
       const data = await response.json();
       
-      if (data.Users) setUsers(data.Users);
-      if (data.Customers) setCustomers(data.Customers);
+      if (Array.isArray(data.Users)) setUsers(data.Users);
+      if (Array.isArray(data.Customers)) setCustomers(data.Customers);
       
-      if (data.Inventory) {
+      if (Array.isArray(data.Inventory)) {
         setInventory(data.Inventory.map((p: any) => ({
           ...p,
           quantity: Number(p.quantity || 0),
@@ -68,23 +74,24 @@ export const useGonzacarsStore = () => {
         })));
       }
       
-      if (data.Repairs) {
+      if (Array.isArray(data.Repairs)) {
         setRepairs(data.Repairs.map((r: any) => ({
           ...r,
-          items: (r.items || []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) })),
-          installments: (r.installments || []).map((inst: any) => ({ ...inst, amount: Number(inst.amount || 0) }))
+          year: Number(r.year || 0),
+          items: (Array.isArray(r.items) ? r.items : []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) })),
+          installments: (Array.isArray(r.installments) ? r.installments : []).map((inst: any) => ({ ...inst, amount: Number(inst.amount || 0) }))
         })));
       }
       
-      if (data.Sales) {
+      if (Array.isArray(data.Sales)) {
         setSales(data.Sales.map((s: any) => ({
           ...s,
           total: Number(s.total || 0),
-          items: (s.items || []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) }))
+          items: (Array.isArray(s.items) ? s.items : []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) }))
         })));
       }
       
-      if (data.Purchases) {
+      if (Array.isArray(data.Purchases)) {
         setPurchases(data.Purchases.map((p: any) => ({
           ...p,
           price: Number(p.price || 0),
@@ -93,14 +100,14 @@ export const useGonzacarsStore = () => {
         })));
       }
       
-      if (data.Expenses) {
+      if (Array.isArray(data.Expenses)) {
         setExpenses(data.Expenses.map((e: any) => ({
           ...e,
           amount: Number(e.amount || 0)
         })));
       }
       
-      if (data.Employees) {
+      if (Array.isArray(data.Employees)) {
         setEmployees(data.Employees.map((e: any) => ({
           ...e,
           baseSalary: Number(e.baseSalary || 0),
@@ -108,8 +115,10 @@ export const useGonzacarsStore = () => {
         })));
       }
       
-      const rateSetting = data.Settings?.find((s: any) => s.key === 'exchangeRate');
-      if (rateSetting) setExchangeRate(Number(rateSetting.value));
+      if (Array.isArray(data.Settings)) {
+        const rateSetting = data.Settings.find((s: any) => s.key === 'exchangeRate');
+        if (rateSetting) setExchangeRate(Number(rateSetting.value));
+      }
       
     } catch (error) {
       console.error("Error cargando datos de Sheets:", error);

@@ -1,10 +1,12 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+// Fix: Correct initialization of GoogleGenAI with an object
 export const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
+// Fix: Use 'gemini-3-flash-preview' for basic text improvement and ensure response.text property access
 export const improveDiagnosis = async (prompt: string) => {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
@@ -14,6 +16,7 @@ export const improveDiagnosis = async (prompt: string) => {
   return response.text;
 };
 
+// Fix: Use 'gemini-3-pro-preview' for complex auditing tasks and ensure response.text property access
 export const generateFinanceAudit = async (data: any) => {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
@@ -27,10 +30,11 @@ export const generateFinanceAudit = async (data: any) => {
   return response.text;
 };
 
+// Fix: Use 'gemini-3-flash-preview' for text-based classification and ensure response.text property access
 export const suggestExpenseCategory = async (description: string) => {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-lite-latest',
+    model: 'gemini-3-flash-preview',
     contents: `Dada la descripción de un gasto: "${description}", clasifícalo en una de estas categorías: Limpieza, Oficina, Víveres, Impuesto, Aseo Urbano, Internet. Responde SOLO con el nombre de la categoría.`,
   });
   return response.text?.trim();
