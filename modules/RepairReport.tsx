@@ -323,57 +323,57 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </div>
               </div>
 
-              <div className="overflow-hidden border border-slate-200 rounded-[2.5rem] shadow-sm">
+              <div className="overflow-hidden border border-slate-200 rounded-[2.5rem] shadow-sm bg-white">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="text-left bg-slate-100/80 border-b border-slate-200">
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Categoría</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Descripción del Item</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Cant.</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Precio ($)</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Subtotal</th>
-                      <th className="px-8 py-5 no-print"></th>
+                    <tr className="text-left bg-slate-50 border-b-2 border-slate-100">
+                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest">Categoría</th>
+                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest">Descripción del Item</th>
+                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-center">Cant.</th>
+                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-right">Precio ($)</th>
+                      <th className="px-8 py-6 text-[11px] font-black text-slate-600 uppercase tracking-widest text-right">Subtotal</th>
+                      <th className="px-8 py-6 no-print"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {currentRepair.items.map(item => (
-                      <tr key={item.id} className="group hover:bg-blue-50/40 transition-all border-l-4 border-transparent hover:border-blue-500">
-                        <td className="px-8 py-5">
-                          <span className={`text-[9px] px-3 py-1.5 rounded-xl font-black uppercase shadow-sm border ${
+                      <tr key={item.id} className="group hover:bg-blue-50/30 transition-all border-l-4 border-transparent hover:border-blue-500 even:bg-slate-50/30">
+                        <td className="px-8 py-6">
+                          <span className={`text-[9px] px-3 py-1.5 rounded-full font-black uppercase shadow-sm border ${
                             item.type === 'Repuesto' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                             item.type === 'Consumible' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-purple-100 text-purple-700 border-purple-200'
                           }`}>{item.type}</span>
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-8 py-6">
                           <input 
                             type="text" 
-                            className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-3 py-2 rounded-xl transition-all font-bold text-slate-800 outline-none uppercase text-sm"
+                            className="w-full bg-slate-100/50 border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-4 py-2 rounded-xl transition-all font-bold text-slate-800 outline-none uppercase text-sm"
                             value={item.description}
                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                           />
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-8 py-6">
                           <div className="flex items-center justify-center gap-3">
                             <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="no-print p-2 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"><Minus size={12}/></button>
-                            <span className="font-black text-slate-900 bg-white px-4 py-1.5 rounded-xl border border-slate-200 shadow-sm min-w-[40px] text-center text-sm">{item.quantity}</span>
+                            <span className="font-black text-slate-900 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm min-w-[44px] text-center text-sm">{item.quantity}</span>
                             <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="no-print p-2 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200"><Plus size={12}/></button>
                           </div>
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <span className="text-slate-400 text-xs font-bold">$</span>
                             <input 
                               type="number" 
-                              className="w-24 text-right bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-3 py-2 rounded-xl transition-all font-black text-sm"
+                              className="w-24 text-right bg-slate-100/50 border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white px-4 py-2 rounded-xl transition-all font-black text-sm"
                               value={item.price}
                               onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
                             />
                           </div>
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-8 py-6 text-right">
                           <span className="font-black text-slate-900 text-base tracking-tighter">${(item.price * item.quantity).toFixed(2)}</span>
                         </td>
-                        <td className="px-8 py-5 text-right no-print">
+                        <td className="px-8 py-6 text-right no-print">
                           <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500 hover:bg-white p-2.5 rounded-xl transition-all border border-transparent hover:border-red-100">
                             <Trash2 size={18}/>
                           </button>
@@ -382,7 +382,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                     ))}
                     {currentRepair.items.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs italic">La orden de reparación no contiene cargos registrados</td>
+                        <td colSpan={6} className="px-8 py-24 text-center text-slate-400 font-black uppercase tracking-widest text-xs italic">La orden de reparación no contiene cargos registrados</td>
                       </tr>
                     )}
                   </tbody>
