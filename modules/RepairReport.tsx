@@ -1,7 +1,31 @@
 
 import React, { useState } from 'react';
-import { Search, Plus, Trash2, Printer, CheckCircle, Package, Wrench, Fuel, Minus, ClipboardList, DollarSign, ChevronDown, Camera, Download, Wallet, History, AlertCircle } from 'lucide-react';
+import { 
+  Search, 
+  Plus, 
+  Trash2, 
+  Printer, 
+  CheckCircle, 
+  Package, 
+  Wrench, 
+  Fuel, 
+  Minus, 
+  ClipboardList, 
+  DollarSign, 
+  ChevronDown, 
+  Camera, 
+  Download, 
+  Wallet, 
+  History, 
+  AlertCircle,
+  Maximize2,
+  X,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
+
+const LOGO_URL = "https://i.ibb.co/MDhy5tzK/image-2.png";
 
 const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [searchPlate, setSearchPlate] = useState('');
@@ -11,12 +35,14 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [invSearchTerm, setInvSearchTerm] = useState('');
   
+  // Lightbox State
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  
   const [tempPaymentMethod, setTempPaymentMethod] = useState<PaymentMethod>('Efectivo $');
   const [abonoAmount, setAbonoAmount] = useState<number>(0);
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
 
   const handleSearch = () => {
-    // Nueva validación flexible: Solo texto y números
     const plateRegex = /^[A-Z0-9]+$/i;
     
     if (!searchPlate.trim()) {
@@ -196,8 +222,26 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     p.barcode?.includes(invSearchTerm)
   );
 
+  const navigateLightbox = (direction: 'next' | 'prev') => {
+    if (activePhotoIndex === null || !currentRepair?.evidencePhotos) return;
+    const photos = currentRepair.evidencePhotos;
+    if (direction === 'next') {
+      setActivePhotoIndex((activePhotoIndex + 1) % photos.length);
+    } else {
+      setActivePhotoIndex((activePhotoIndex - 1 + photos.length) % photos.length);
+    }
+  };
+
   return (
     <div className="p-8">
+      {/* Cabecera de Impresión - Solo visible al imprimir */}
+      <div className="print-only mb-10 text-center border-b-2 border-slate-900 pb-6">
+        <img src={LOGO_URL} alt="Logo Gonzacars" className="w-24 h-24 mx-auto mb-4 object-contain" />
+        <h1 className="text-3xl font-black uppercase tracking-tighter">Gonzacars C.A.</h1>
+        <p className="text-xs font-bold uppercase tracking-widest mt-1">R.I.F. J-12345678-9 | Taller Mecánico & Repuestos</p>
+        <p className="text-[10px] font-medium mt-1">Puerto Ordaz, Edo. Bolívar, Venezuela</p>
+      </div>
+
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 flex gap-4 no-print">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
@@ -255,22 +299,27 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
 
               {currentRepair.evidencePhotos && currentRepair.evidencePhotos.length > 0 && (
-                <div className="lg:col-span-5 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <div className="lg:col-span-5 bg-slate-50 p-6 rounded-2xl border border-slate-100 no-print">
                   <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Camera size={16} /> Evidencias
+                    <Camera size={16} /> Evidencias de Taller
                   </h3>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     {currentRepair.evidencePhotos.map((photo, idx) => (
-                      <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white">
-                        <img src={photo} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center no-print p-2">
-                           <a href={photo} download={`evidencia_${currentRepair.plate}_${idx + 1}.png`} className="bg-white p-1.5 rounded-md text-blue-600 shadow-xl">
-                            <Download size={14} />
-                          </a>
+                      <div 
+                        key={idx} 
+                        onClick={() => setActivePhotoIndex(idx)}
+                        className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-white cursor-zoom-in shadow-sm hover:shadow-md transition-all"
+                      >
+                        <img src={photo} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                           <div className="bg-white/90 p-2 rounded-xl text-slate-900 shadow-xl">
+                              <Maximize2 size={16} />
+                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4 text-center">Haga clic en una foto para ampliar</p>
                 </div>
               )}
             </div>
@@ -461,6 +510,48 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           </div>
           <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Reparaciones</h4>
           <p className="mt-2 text-slate-500 text-center font-medium max-w-sm px-6">Localice un vehículo por placa para gestionar sus estados, cargos, abonos y cierre definitivo.</p>
+        </div>
+      )}
+
+      {/* Visor de Fotos - Lightbox */}
+      {activePhotoIndex !== null && currentRepair?.evidencePhotos && (
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md flex items-center justify-center z-[200] p-6 no-print animate-in fade-in duration-300">
+           <button 
+            onClick={() => setActivePhotoIndex(null)}
+            className="absolute top-6 right-6 w-14 h-14 bg-white/10 hover:bg-white/20 text-white rounded-2xl flex items-center justify-center transition-all z-[210] border border-white/10"
+           >
+              <X size={28} />
+           </button>
+
+           <div className="relative w-full h-full flex items-center justify-center">
+              {/* Botón Anterior */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); navigateLightbox('prev'); }}
+                className="absolute left-0 w-16 h-16 bg-white/5 hover:bg-white/10 text-white rounded-2xl flex items-center justify-center transition-all border border-white/5"
+              >
+                <ChevronLeft size={32} />
+              </button>
+
+              <div className="max-w-[85%] max-h-[85%] relative group">
+                <img 
+                  src={currentRepair.evidencePhotos[activePhotoIndex]} 
+                  className="w-full h-full object-contain rounded-3xl shadow-2xl animate-in zoom-in-95 duration-500"
+                  alt={`Evidencia ${activePhotoIndex + 1}`}
+                />
+                
+                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-white/60 text-xs font-black uppercase tracking-[0.3em]">
+                  Foto {activePhotoIndex + 1} de {currentRepair.evidencePhotos.length}
+                </div>
+              </div>
+
+              {/* Botón Siguiente */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); navigateLightbox('next'); }}
+                className="absolute right-0 w-16 h-16 bg-white/5 hover:bg-white/10 text-white rounded-2xl flex items-center justify-center transition-all border border-white/5"
+              >
+                <ChevronRight size={32} />
+              </button>
+           </div>
         </div>
       )}
 
