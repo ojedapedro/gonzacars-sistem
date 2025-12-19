@@ -58,7 +58,7 @@ const App: React.FC = () => {
       return ['dashboard', 'customers', 'repair-reg', 'repair-rep', 'sales', 'inventory'].includes(tab);
     }
     if (role === 'cajero') {
-      return ['dashboard', 'sales', 'expenses', 'finance'].includes(tab);
+      return ['dashboard', 'sales', 'expenses', 'finance', 'payroll'].includes(tab);
     }
     return false;
   };
@@ -239,6 +239,7 @@ const App: React.FC = () => {
           <MenuHeader label="Administración" />
           <NavItem icon={<BarChart3 size={20}/>} label="Finanzas" active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} visible={hasPermission('finance')} />
           <NavItem icon={<Wallet size={20}/>} label="Gastos" active={activeTab === 'expenses'} onClick={() => setActiveTab('expenses')} visible={hasPermission('expenses')} />
+          <NavItem icon={<Users size={20}/>} label="Nómina" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} visible={hasPermission('payroll')} />
           <NavItem icon={<ShieldCheck size={20}/>} label="Usuarios" active={activeTab === 'user-mgmt'} onClick={() => setActiveTab('user-mgmt')} visible={hasPermission('user-mgmt')} />
         </nav>
 

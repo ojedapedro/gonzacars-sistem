@@ -114,6 +114,15 @@ export const useGonzacarsStore = () => {
           commissionRate: Number(e.commissionRate || 0)
         })));
       }
+
+      if (Array.isArray(data.Payroll)) {
+        setPayroll(data.Payroll.map((pr: any) => ({
+          ...pr,
+          baseSalary: Number(pr.baseSalary || 0),
+          commission: Number(pr.commission || 0),
+          total: Number(pr.total || 0)
+        })));
+      }
       
       if (Array.isArray(data.Settings)) {
         const rateSetting = data.Settings.find((s: any) => s.key === 'exchangeRate');
@@ -241,6 +250,11 @@ export const useGonzacarsStore = () => {
     syncRow('Employees', 'update', emp);
   };
 
+  const addPayrollRecord = (record: PayrollRecord) => {
+    setPayroll(prev => [...prev, record]);
+    syncRow('Payroll', 'add', record);
+  };
+
   const updateInventoryPrice = (id: string, newPrice: number) => {
     const item = inventory.find(p => p.id === id);
     if (item) {
@@ -281,6 +295,6 @@ export const useGonzacarsStore = () => {
     purchases, setPurchases, addPurchase,
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee,
-    payroll, setPayroll
+    payroll, setPayroll, addPayrollRecord
   };
 };

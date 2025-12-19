@@ -27,7 +27,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
   });
 
   const filteredEmployees = useMemo(() => {
-    return store.employees.filter((e: Employee) => 
+    return (store.employees || []).filter((e: Employee) => 
       e.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [store.employees, searchQuery]);
@@ -38,7 +38,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       return { base: emp.baseSalary, commission: 0, total: emp.baseSalary, repairCount: 0 };
     }
 
-    const completedRepairs = store.repairs.filter((r: VehicleRepair) => 
+    const completedRepairs = (store.repairs || []).filter((r: VehicleRepair) => 
       r.mechanicId === emp.id && r.status === 'Entregado'
     );
 
@@ -86,14 +86,17 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
         total: earnings.total,
         status: 'Pagado'
       };
-      // Aquí se llamaría a store.addPayrollRecord si existiera la persistencia específica, 
-      // por ahora simulamos el éxito.
-      alert(`Pago de nómina registrado correctamente para ${emp.name}`);
+      
+      if (store.addPayrollRecord) {
+        store.addPayrollRecord(record);
+      } else {
+        alert(`Pago de $${earnings.total.toFixed(2)} simulado con éxito para ${emp.name}`);
+      }
     }
   };
 
   const totals = useMemo(() => {
-    return store.employees.reduce((acc: any, emp: Employee) => {
+    return (store.employees || []).reduce((acc: any, emp: Employee) => {
       const e = getEmployeeEarnings(emp);
       acc.total += e.total;
       acc.commissions += e.commission;
@@ -288,7 +291,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                   <input 
                     required 
                     type="number" 
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-lg outline-none focus:ring-4 focus:ring-blue-50 transition-all" 
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-lg outline-none focus:ring-4 focus:ring-blue-50 font-bold transition-all" 
                     value={newEmployee.baseSalary || ''} 
                     onChange={(e) => setNewEmployee({...newEmployee, baseSalary: Number(e.target.value)})} 
                   />
