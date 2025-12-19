@@ -55,11 +55,12 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
     { name: 'Gastos', value: totalExpenses, fill: '#f59e0b' }
   ];
 
-  // Fix: Explicitly type the accumulator and initial value to avoid TypeScript index signature and type mismatch errors
-  const categoryData = Object.values(
+  const categoryData: { name: string; value: number }[] = Object.values(
     filteredData.expenses.reduce((acc: Record<string, { name: string; value: number }>, curr: any) => {
       const cat = curr.category || 'Varios';
-      acc[cat] = acc[cat] || { name: cat, value: 0 };
+      if (!acc[cat]) {
+        acc[cat] = { name: cat, value: 0 };
+      }
       acc[cat].value += Number(curr.amount || 0);
       return acc;
     }, {} as Record<string, { name: string; value: number }>)
