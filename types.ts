@@ -83,6 +83,7 @@ export interface Sale {
 
 export interface Purchase {
   id: string;
+  invoiceId: string; // ID único para agrupar ítems de una misma factura
   date: string;
   provider: string;
   invoiceNumber: string;
@@ -93,6 +94,7 @@ export interface Purchase {
   quantity: number;
   total: number;
   type: 'Contado' | 'Crédito';
+  status: 'Pendiente' | 'Cerrada';
 }
 
 export interface Expense {

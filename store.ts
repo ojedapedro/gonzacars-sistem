@@ -199,14 +199,20 @@ export const useGonzacarsStore = () => {
     setPurchases(prev => [...prev, purchase]);
     syncRow('Purchases', 'add', purchase);
     
+    // Todas las compras (Pendientes y Cerradas) actualizan el inventario
     const existing = inventory.find(p => p.id === purchase.productId || p.name === purchase.productName);
     if (existing) {
-      const updated = { ...existing, quantity: existing.quantity + purchase.quantity, cost: purchase.price, lastEntry: purchase.date };
+      const updated = { 
+        ...existing, 
+        quantity: existing.quantity + purchase.quantity, 
+        cost: purchase.price, 
+        lastEntry: purchase.date 
+      };
       setInventory(prev => prev.map(p => p.id === existing.id ? updated : p));
       syncRow('Inventory', 'update', updated);
     } else {
-      const newItem = {
-        id: purchase.productId || Math.random().toString(36).substr(2, 9),
+      const newItem: Product = {
+        id: Math.random().toString(36).substr(2, 9),
         barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
         name: purchase.productName,
         category: purchase.category,
