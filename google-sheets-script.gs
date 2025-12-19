@@ -12,7 +12,7 @@ function setupDatabase() {
   const sheets = [
     { name: 'Customers', headers: ['id', 'name', 'phone', 'email', 'address', 'createdAt'] },
     { name: 'Inventory', headers: ['id', 'barcode', 'name', 'category', 'quantity', 'cost', 'price', 'lastEntry'] },
-    { name: 'Repairs', headers: ['id', 'customerId', 'plate', 'brand', 'model', 'year', 'ownerName', 'responsible', 'status', 'diagnosis', 'serviceType', 'mechanicId', 'evidencePhoto', 'items', 'createdAt', 'finishedAt', 'paymentMethod'] },
+    { name: 'Repairs', headers: ['id', 'customerId', 'plate', 'brand', 'model', 'year', 'ownerName', 'responsible', 'status', 'diagnosis', 'serviceType', 'mechanicId', 'evidencePhotos', 'items', 'createdAt', 'finishedAt', 'paymentMethod'] },
     { name: 'Sales', headers: ['id', 'customerId', 'date', 'customerName', 'items', 'total', 'iva', 'paymentMethod'] },
     { name: 'Purchases', headers: ['id', 'date', 'provider', 'invoiceNumber', 'productId', 'productName', 'category', 'price', 'quantity', 'total', 'type'] },
     { name: 'Expenses', headers: ['id', 'date', 'category', 'description', 'amount'] },
@@ -48,8 +48,8 @@ function doGet(e) {
       const obj = {};
       headers.forEach((h, i) => {
         let val = row[i];
-        // Intentar parsear JSON para campos complejos (items)
-        if (h === 'items' && typeof val === 'string' && val.startsWith('[')) {
+        // Intentar parsear JSON para campos complejos (items, evidencePhotos)
+        if ((h === 'items' || h === 'evidencePhotos') && typeof val === 'string' && val.startsWith('[')) {
           try { val = JSON.parse(val); } catch (e) {}
         }
         obj[h] = val;

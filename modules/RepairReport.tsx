@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Plus, Trash2, Printer, CheckCircle, Package, Wrench, Fuel, Minus, Save, ClipboardList, DollarSign, ChevronDown, Camera, Download } from 'lucide-react';
+import { Search, Plus, Trash2, Printer, CheckCircle, Package, Wrench, Fuel, Minus, ClipboardList, DollarSign, ChevronDown, Camera, Download, Wallet } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus } from '../types';
 
 const RepairReport: React.FC<{ store: any }> = ({ store }) => {
@@ -9,11 +9,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [invSearchTerm, setInvSearchTerm] = useState('');
+  const [tempPaymentMethod, setTempPaymentMethod] = useState<PaymentMethod>('Efectivo $');
 
   const handleSearch = () => {
     const found = store.repairs.find((r: VehicleRepair) => r.plate.toUpperCase() === searchPlate.toUpperCase());
     if (found) {
       setCurrentRepair({ ...found });
+      if (found.paymentMethod) setTempPaymentMethod(found.paymentMethod);
     } else {
       alert('Placa no encontrada');
       setCurrentRepair(null);
@@ -78,13 +80,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     return currentRepair.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   };
 
-  const finalizeRepair = (method: PaymentMethod) => {
+  const finalizeRepair = () => {
     if (!currentRepair) return;
     const updated: VehicleRepair = {
       ...currentRepair,
       status: 'Entregado',
       finishedAt: new Date().toISOString(),
-      paymentMethod: method
+      paymentMethod: tempPaymentMethod
     };
     store.updateRepair(updated);
     setCurrentRepair(updated);
@@ -98,11 +100,11 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       items: currentRepair.items.map(i => ({ productId: i.id, name: i.description, price: i.price, quantity: i.quantity })),
       total: calculateTotal(),
       iva: false,
-      paymentMethod: method
+      paymentMethod: tempPaymentMethod
     });
 
     alert('Reparación finalizada e informe generado.');
-    window.print();
+    setTimeout(() => window.print(), 500);
   };
 
   const getStatusStyles = (status: ServiceStatus) => {
@@ -177,32 +179,37 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           </div>
 
           <div className="p-8 space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Diagnosis */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex-1">
+              <div className="lg:col-span-7 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                   <ClipboardList size={16} /> Diagnóstico Técnico
                 </h3>
                 <p className="text-slate-700 italic leading-relaxed font-medium">"{currentRepair.diagnosis}"</p>
               </div>
 
-              {/* Evidence Photo Download Section */}
-              {currentRepair.evidencePhoto && (
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex-1">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <Camera size={16} /> Evidencia Visual
-                    </h3>
-                    <a 
-                      href={currentRepair.evidencePhoto} 
-                      download={`evidencia_${currentRepair.plate}_${currentRepair.id}.png`}
-                      className="no-print flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm hover:shadow-md transition-all uppercase tracking-widest"
-                    >
-                      <Download size={14} /> Descargar Foto
-                    </a>
-                  </div>
-                  <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <img src={currentRepair.evidencePhoto} className="w-full h-full object-cover" alt="Evidencia de reparación" />
+              {/* Evidence Photos Grid - Minimalist approach */}
+              {currentRepair.evidencePhotos && currentRepair.evidencePhotos.length > 0 && (
+                <div className="lg:col-span-5 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Camera size={16} /> Evidencias
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {currentRepair.evidencePhotos.map((photo, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white">
+                        <img src={photo} className="w-full h-full object-cover" alt={`Evidencia ${idx + 1}`} />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center no-print p-2">
+                           <a 
+                            href={photo} 
+                            download={`evidencia_${currentRepair.plate}_${idx + 1}.png`}
+                            className="bg-white p-1.5 rounded-md text-blue-600 shadow-xl hover:scale-105 transition-transform"
+                            title="Descargar imagen"
+                          >
+                            <Download size={14} />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -307,6 +314,15 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   <span>En Bolívares</span>
                   <span className="text-slate-600">{(calculateTotal() * store.exchangeRate).toLocaleString('es-VE')} Bs</span>
                 </div>
+                
+                {/* Visualización de Pago en Reporte Final */}
+                {(currentRepair.status === 'Entregado' || currentRepair.paymentMethod) && (
+                  <div className="flex justify-between w-72 text-xs font-black text-blue-600 uppercase tracking-widest pt-3">
+                    <span>Método de Pago</span>
+                    <span>{currentRepair.paymentMethod || tempPaymentMethod}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between w-72 items-center mt-6 border-t border-slate-200 pt-5">
                   <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Orden</span>
                   <span className="text-4xl font-black text-blue-600 tracking-tighter">${calculateTotal().toFixed(2)}</span>
@@ -322,13 +338,28 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               >
                 <Printer size={18}/> Imprimir Informe
               </button>
+              
               {currentRepair.status !== 'Entregado' && (
-                <button 
-                  onClick={() => setShowPayModal(true)}
-                  className="flex-1 min-w-[200px] bg-green-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-green-700 shadow-xl shadow-green-100 transition-all"
-                >
-                  <CheckCircle size={18}/> Procesar Cierre y Pago
-                </button>
+                <div className="flex-1 min-w-[300px] flex gap-2">
+                  <div className="flex-1 relative">
+                    <Wallet size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <select 
+                      className="w-full pl-11 pr-4 py-4 bg-slate-100 border-2 border-slate-100 rounded-xl font-black uppercase text-[10px] tracking-widest outline-none focus:border-blue-500 transition-all appearance-none"
+                      value={tempPaymentMethod}
+                      onChange={(e) => setTempPaymentMethod(e.target.value as PaymentMethod)}
+                    >
+                      {['Efectivo Bs', 'Efectivo $', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button 
+                    onClick={() => setShowPayModal(true)}
+                    className="flex-[1.5] bg-green-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-green-700 shadow-xl shadow-green-100 transition-all"
+                  >
+                    <CheckCircle size={18}/> Procesar Cierre
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -343,7 +374,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* Modals remain the same... */}
+      {/* Inventory Search Modal */}
       {showInventorySearch && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[80vh]">
@@ -388,28 +419,24 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
+      {/* Confirmation Modal */}
       {showPayModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
             <div className="w-24 h-24 bg-green-100 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3">
-              <DollarSign size={48} />
+              <CheckCircle size={48} />
             </div>
-            <h3 className="text-3xl font-black mb-2 text-slate-800 uppercase tracking-tighter">Cierre de Orden</h3>
-            <p className="text-slate-500 mb-8 font-medium">Seleccione el método de pago para liquidar la cuenta y entregar el vehículo.</p>
+            <h3 className="text-3xl font-black mb-2 text-slate-800 uppercase tracking-tighter">Confirmar Cierre</h3>
+            <p className="text-slate-500 mb-8 font-medium italic">Se registrará el pago por <strong>{tempPaymentMethod}</strong> y se cerrará la orden de forma definitiva.</p>
             
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              {(['Efectivo Bs', 'Efectivo $', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'] as PaymentMethod[]).map(m => (
-                <button 
-                  key={m}
-                  onClick={() => finalizeRepair(m)}
-                  className="px-4 py-4 border-2 border-slate-100 rounded-2xl font-black text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all text-[10px] uppercase tracking-widest shadow-sm active:scale-95"
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <button 
+              onClick={finalizeRepair}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all mb-4"
+            >
+              Confirmar y Finalizar
+            </button>
 
-            <button onClick={() => setShowPayModal(false)} className="w-full py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-all">Regresar</button>
+            <button onClick={() => setShowPayModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-all">Regresar</button>
           </div>
         </div>
       )}

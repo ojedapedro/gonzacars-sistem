@@ -44,7 +44,7 @@ export interface VehicleRepair {
   diagnosis: string;
   serviceType: string;
   mechanicId: string;
-  evidencePhoto?: string;
+  evidencePhotos?: string[]; // Cambiado de evidencePhoto a un array de strings (base64)
   items: RepairItem[];
   createdAt: string;
   finishedAt?: string;

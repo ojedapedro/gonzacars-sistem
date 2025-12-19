@@ -47,8 +47,10 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
   const totalInvoiced = filteredPurchases.reduce((acc: number, p: Purchase) => acc + p.total, 0);
 
   // Obtener categorías únicas para sugerencias de filtro
-  const categories = useMemo(() => {
-    const cats = new Set(store.purchases.map((p: Purchase) => p.category));
+  // Fix: Explicitly type categories as string[] to avoid 'unknown' type inference issues
+  const categories = useMemo<string[]>(() => {
+    const purchases = (store.purchases || []) as Purchase[];
+    const cats = new Set(purchases.map((p: Purchase) => p.category));
     return Array.from(cats);
   }, [store.purchases]);
 
@@ -130,7 +132,8 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
                   <input required type="text" list="prev-categories" placeholder="Ej: Motor" className="w-full px-4 py-3.5 bg-white border border-slate-100 rounded-2xl font-bold outline-none shadow-sm" value={formData.category || ''} onChange={(e) => setFormData({...formData, category: e.target.value})} />
                   <datalist id="prev-categories">
-                    {categories.map(c => <option key={c} value={c} />)}
+                    {/* Fix: Added explicit string type for map callback parameter */}
+                    {categories.map((c: string) => <option key={c} value={c} />)}
                   </datalist>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -181,7 +184,8 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                 onChange={(e) => setFilters({...filters, category: e.target.value})}
               >
                 <option value="">Todas</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {/* Fix: Added explicit string type for map callback parameter */}
+                {categories.map((c: string) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="w-44 space-y-1.5">

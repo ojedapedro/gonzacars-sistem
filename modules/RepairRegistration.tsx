@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Camera, Save, Sparkles, Loader2, ClipboardCheck, X } from 'lucide-react';
+import { Camera, Save, Sparkles, Loader2, X, Plus, Image as ImageIcon } from 'lucide-react';
 import { VehicleRepair, ServiceStatus, Customer } from '../types';
 import { improveDiagnosis } from '../lib/gemini';
 
@@ -10,6 +10,7 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     status: 'Ingresado',
     year: new Date().getFullYear(),
     items: [],
+    evidencePhotos: [],
     createdAt: new Date().toISOString()
   });
 
@@ -31,10 +32,19 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, evidencePhoto: reader.result as string });
+        const currentPhotos = formData.evidencePhotos || [];
+        if (currentPhotos.length < 4) {
+          setFormData({ ...formData, evidencePhotos: [...currentPhotos, reader.result as string] });
+        }
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const removePhoto = (index: number) => {
+    const currentPhotos = [...(formData.evidencePhotos || [])];
+    currentPhotos.splice(index, 1);
+    setFormData({ ...formData, evidencePhotos: currentPhotos });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -52,8 +62,10 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     };
     store.addRepair(newRepair);
     alert('Vehículo registrado correctamente');
-    setFormData({ status: 'Ingresado', year: new Date().getFullYear(), items: [] });
+    setFormData({ status: 'Ingresado', year: new Date().getFullYear(), items: [], evidencePhotos: [] });
   };
+
+  const photoCount = (formData.evidencePhotos || []).length;
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -112,31 +124,36 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Evidencia Fotográfica (Opcional)</label>
-            <div className="flex items-center gap-4">
-              {!formData.evidencePhoto ? (
-                <label className="cursor-pointer flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-slate-400 hover:text-blue-500">
-                  <Camera size={28} />
-                  <span className="text-[10px] font-black uppercase tracking-widest mt-2">Subir Foto</span>
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
-                </label>
-              ) : (
-                <div className="relative group">
-                  <img src={formData.evidencePhoto} className="w-32 h-32 object-cover rounded-xl border border-slate-200 shadow-sm" />
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <Camera size={16} className="text-blue-500" /> Evidencias Visuales
+              </label>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photoCount === 4 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                {photoCount} / 4 Fotos
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-3">
+              {(formData.evidencePhotos || []).map((photo, idx) => (
+                <div key={idx} className="relative aspect-square group">
+                  <img src={photo} className="w-full h-full object-cover rounded-xl border border-slate-200 shadow-sm" />
                   <button 
                     type="button"
-                    onClick={() => setFormData({...formData, evidencePhoto: undefined})}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-all"
+                    onClick={() => removePhoto(idx)}
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
                   >
-                    <X size={14} />
+                    <X size={10} />
                   </button>
                 </div>
+              ))}
+              {photoCount < 4 && (
+                <label className="cursor-pointer flex flex-col items-center justify-center aspect-square border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-white transition-all text-slate-400 hover:text-blue-500 bg-white/50">
+                  <Plus size={20} />
+                  <span className="text-[8px] font-black uppercase mt-1">Añadir</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                </label>
               )}
-              <div className="flex-1 text-xs text-slate-500">
-                <p className="font-bold">Recomendación:</p>
-                <p>Capture una foto de la parte frontal o del área específica a reparar para mayor respaldo.</p>
-              </div>
             </div>
           </div>
 
