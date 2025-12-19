@@ -1,23 +1,39 @@
 
 import React, { useState } from 'react';
-import { Search, Plus, Trash2, Printer, CheckCircle, Package, Wrench, Fuel, Minus, ClipboardList, DollarSign, ChevronDown, Camera, Download, Wallet } from 'lucide-react';
-import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus } from '../types';
+import { Search, Plus, Trash2, Printer, CheckCircle, Package, Wrench, Fuel, Minus, ClipboardList, DollarSign, ChevronDown, Camera, Download, Wallet, History, AlertCircle } from 'lucide-react';
+import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
 const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [searchPlate, setSearchPlate] = useState('');
   const [currentRepair, setCurrentRepair] = useState<VehicleRepair | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showAbonoModal, setShowAbonoModal] = useState(false);
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [invSearchTerm, setInvSearchTerm] = useState('');
+  
   const [tempPaymentMethod, setTempPaymentMethod] = useState<PaymentMethod>('Efectivo $');
+  const [abonoAmount, setAbonoAmount] = useState<number>(0);
+  const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
 
   const handleSearch = () => {
+    const plateRegex = /^[A-Z]{3}-\d{3,4}$/i;
+    
+    if (!searchPlate.trim()) {
+      alert('Por favor ingrese una placa');
+      return;
+    }
+
+    if (!plateRegex.test(searchPlate)) {
+      alert('Formato de placa inválido. Use el formato AAA-123 (ej: ABC-123)');
+      return;
+    }
+
     const found = store.repairs.find((r: VehicleRepair) => r.plate.toUpperCase() === searchPlate.toUpperCase());
     if (found) {
       setCurrentRepair({ ...found });
       if (found.paymentMethod) setTempPaymentMethod(found.paymentMethod);
     } else {
-      alert('Placa no encontrada');
+      alert('Placa no encontrada en el sistema');
       setCurrentRepair(null);
     }
   };
@@ -47,6 +63,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     if (!currentRepair) return;
     const newItem: RepairItem = {
       id: Math.random().toString(36).substr(2, 9),
+      productId: product.id,
       type: 'Repuesto',
       description: product.name,
       quantity: 1,
@@ -80,30 +97,84 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     return currentRepair.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   };
 
+  const calculatePaid = () => {
+    if (!currentRepair || !currentRepair.installments) return 0;
+    return currentRepair.installments.reduce((acc, inst) => acc + inst.amount, 0);
+  };
+
+  const calculateBalance = () => {
+    return calculateTotal() - calculatePaid();
+  };
+
+  const registerAbono = () => {
+    if (!currentRepair || abonoAmount <= 0) return;
+    
+    const newInstallment: Installment = {
+      id: Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      amount: abonoAmount,
+      method: abonoMethod
+    };
+
+    const updated: VehicleRepair = {
+      ...currentRepair,
+      installments: [...(currentRepair.installments || []), newInstallment]
+    };
+
+    store.updateRepair(updated);
+    setCurrentRepair(updated);
+    setShowAbonoModal(false);
+    setAbonoAmount(0);
+    alert('Abono registrado correctamente.');
+  };
+
   const finalizeRepair = () => {
     if (!currentRepair) return;
+    const balance = calculateBalance();
+    
+    // Si hay saldo, registrarlo como el último abono automático al marcar como entregado
+    let updatedInstallments = [...(currentRepair.installments || [])];
+    if (balance > 0) {
+      updatedInstallments.push({
+        id: 'final-payment',
+        date: new Date().toISOString(),
+        amount: balance,
+        method: tempPaymentMethod
+      });
+    }
+
     const updated: VehicleRepair = {
       ...currentRepair,
       status: 'Entregado',
       finishedAt: new Date().toISOString(),
-      paymentMethod: tempPaymentMethod
+      paymentMethod: tempPaymentMethod,
+      installments: updatedInstallments
     };
+
     store.updateRepair(updated);
     setCurrentRepair(updated);
     setShowPayModal(false);
     
+    // Generar la venta para el inventario
     store.addSale({
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
       customerId: currentRepair.customerId,
       date: new Date().toISOString().split('T')[0],
       customerName: currentRepair.ownerName,
-      items: currentRepair.items.map(i => ({ productId: i.id, name: i.description, price: i.price, quantity: i.quantity })),
+      items: currentRepair.items
+        .filter(i => i.type === 'Repuesto' && i.productId)
+        .map(i => ({ 
+          productId: i.productId as string, 
+          name: i.description, 
+          price: i.price, 
+          quantity: i.quantity 
+        })),
       total: calculateTotal(),
       iva: false,
       paymentMethod: tempPaymentMethod
     });
 
-    alert('Reparación finalizada e informe generado.');
+    alert('Reparación finalizada y stock actualizado.');
     setTimeout(() => window.print(), 500);
   };
 
@@ -145,13 +216,11 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {currentRepair ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Header con Selector de Estado */}
+          {/* Header */}
           <div className="p-8 bg-slate-900 text-white flex justify-between items-start">
             <div>
               <div className="flex flex-wrap items-center gap-4 mb-2">
                 <h2 className="text-3xl font-black uppercase tracking-tight">{currentRepair.ownerName}</h2>
-                
-                {/* Selector de Estado Dinámico */}
                 <div className="relative no-print">
                   <select 
                     value={currentRepair.status}
@@ -164,8 +233,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </select>
                   <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                
-                {/* Badge para impresión */}
                 <span className={`print-only px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border-2 ${getStatusStyles(currentRepair.status)}`}>
                   {currentRepair.status}
                 </span>
@@ -188,7 +255,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <p className="text-slate-700 italic leading-relaxed font-medium">"{currentRepair.diagnosis}"</p>
               </div>
 
-              {/* Evidence Photos Grid - Minimalist approach */}
+              {/* Photos */}
               {currentRepair.evidencePhotos && currentRepair.evidencePhotos.length > 0 && (
                 <div className="lg:col-span-5 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                   <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -197,14 +264,9 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   <div className="grid grid-cols-2 gap-2">
                     {currentRepair.evidencePhotos.map((photo, idx) => (
                       <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white">
-                        <img src={photo} className="w-full h-full object-cover" alt={`Evidencia ${idx + 1}`} />
+                        <img src={photo} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center no-print p-2">
-                           <a 
-                            href={photo} 
-                            download={`evidencia_${currentRepair.plate}_${idx + 1}.png`}
-                            className="bg-white p-1.5 rounded-md text-blue-600 shadow-xl hover:scale-105 transition-transform"
-                            title="Descargar imagen"
-                          >
+                           <a href={photo} download={`evidencia_${currentRepair.plate}_${idx + 1}.png`} className="bg-white p-1.5 rounded-md text-blue-600 shadow-xl">
                             <Download size={14} />
                           </a>
                         </div>
@@ -215,12 +277,12 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               )}
             </div>
 
-            {/* Items Management */}
+            {/* Items */}
             <div>
               <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print">
                 <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 uppercase tracking-tighter">Detalle de Cargos</h3>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => setShowInventorySearch(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all">
+                  <button onClick={() => setShowInventorySearch(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all">
                     <Package size={14}/> + Inventario
                   </button>
                   <button onClick={() => addItemManually('Servicio')} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-purple-200 transition-all">
@@ -259,19 +321,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                             className="w-full bg-transparent border-none focus:ring-0 font-bold text-slate-800 outline-none"
                             value={item.description}
                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                            placeholder="Especifique..."
                           />
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-3 font-mono">
-                            <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="p-1 hover:text-blue-600 transition-colors no-print"><Minus size={12}/></button>
-                            <input 
-                              type="number" 
-                              className="w-10 text-center bg-transparent font-black border-none focus:ring-0 p-0"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(item.id, 'quantity', Number(e.target.value))}
-                            />
-                            <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="p-1 hover:text-blue-600 transition-colors no-print"><Plus size={12}/></button>
+                            <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="p-1 hover:text-blue-600 no-print"><Minus size={12}/></button>
+                            <span className="font-black text-slate-800">{item.quantity}</span>
+                            <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="p-1 hover:text-blue-600 no-print"><Plus size={12}/></button>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -289,53 +345,97 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                           <span className="font-black text-slate-900">${(item.price * item.quantity).toFixed(2)}</span>
                         </td>
                         <td className="px-6 py-4 text-right no-print">
-                          <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                          <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500">
                             <Trash2 size={16}/>
                           </button>
                         </td>
                       </tr>
                     ))}
-                    {currentRepair.items.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-300 font-bold italic">No hay cargos registrados aún</td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              {/* Totals Section */}
-              <div className="mt-8 flex flex-col items-end gap-2 bg-slate-50 p-8 rounded-2xl border border-slate-100">
-                <div className="flex justify-between w-72 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-3 mb-1">
-                  <span>Subtotal</span>
-                  <span className="text-slate-800">${calculateTotal().toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between w-72 text-[10px] font-bold text-slate-400 uppercase">
-                  <span>En Bolívares</span>
-                  <span className="text-slate-600">{(calculateTotal() * store.exchangeRate).toLocaleString('es-VE')} Bs</span>
-                </div>
-                
-                {/* Visualización de Pago en Reporte Final */}
-                {(currentRepair.status === 'Entregado' || currentRepair.paymentMethod) && (
-                  <div className="flex justify-between w-72 text-xs font-black text-blue-600 uppercase tracking-widest pt-3">
-                    <span>Método de Pago</span>
-                    <span>{currentRepair.paymentMethod || tempPaymentMethod}</span>
+            {/* SECCIÓN DE ABONOS */}
+            <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200">
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <History size={16} className="text-blue-500" /> Seguimiento de Pagos / Abonos
+                  </h3>
+                  <button 
+                    onClick={() => setShowAbonoModal(true)}
+                    className="no-print px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-blue-500 hover:text-blue-600 transition-all shadow-sm"
+                  >
+                    + Registrar Abono
+                  </button>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    {currentRepair.installments && currentRepair.installments.length > 0 ? (
+                      currentRepair.installments.map((inst) => (
+                        <div key={inst.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
+                           <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(inst.date).toLocaleDateString()} - {new Date(inst.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                              <p className="text-xs font-bold text-slate-700 uppercase mt-1">Metodo: {inst.method}</p>
+                           </div>
+                           <p className="text-lg font-black text-blue-600 tracking-tighter">+ ${inst.amount.toFixed(2)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic font-medium py-4">No se han registrado pagos parciales aún.</p>
+                    )}
                   </div>
-                )}
 
-                <div className="flex justify-between w-72 items-center mt-6 border-t border-slate-200 pt-5">
-                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Orden</span>
-                  <span className="text-4xl font-black text-blue-600 tracking-tighter">${calculateTotal().toFixed(2)}</span>
-                </div>
+                  {/* Resumen de Caja en Informe */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Presupuesto</span>
+                      <span className="text-lg font-black text-slate-800">${calculateTotal().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Abonado a la fecha</span>
+                      <span className="text-lg font-black text-emerald-600">${calculatePaid().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-xs font-black text-blue-500 uppercase tracking-widest">Saldo Pendiente</span>
+                      <div className="text-right">
+                        <span className={`text-3xl font-black tracking-tighter ${calculateBalance() > 0 ? 'text-red-500' : 'text-slate-300'}`}>
+                          ${calculateBalance().toFixed(2)}
+                        </span>
+                        {calculateBalance() > 0 && (
+                          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Deuda por cancelar</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Totals Section Principal */}
+            <div className="flex flex-col items-end gap-2 bg-slate-900 text-white p-8 rounded-[2.5rem]">
+              <div className="flex justify-between w-72 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-white/10 pb-3 mb-1">
+                <span>Total General</span>
+                <span>${calculateTotal().toFixed(2)}</span>
               </div>
+              <div className="flex justify-between w-72 text-xs font-black text-emerald-400 uppercase tracking-widest pt-1">
+                <span>Total Abonado</span>
+                <span>-${calculatePaid().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between w-72 items-center mt-6 border-t border-white/20 pt-5">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <AlertCircle size={14}/> {calculateBalance() > 0 ? 'Por Pagar' : 'Cancelado'}
+                </span>
+                <span className={`text-5xl font-black tracking-tighter ${calculateBalance() > 0 ? 'text-blue-400' : 'text-green-400'}`}>
+                  ${calculateBalance().toFixed(2)}
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase mt-2 italic">Tasa: {store.exchangeRate} Bs/$ ({(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs)</p>
             </div>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-4 pt-8 no-print border-t border-slate-100">
-              <button 
-                onClick={() => window.print()}
-                className="flex-1 min-w-[200px] border-2 border-slate-200 py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
+              <button onClick={() => window.print()} className="flex-1 min-w-[200px] border-2 border-slate-200 py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
                 <Printer size={18}/> Imprimir Informe
               </button>
               
@@ -353,11 +453,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                       ))}
                     </select>
                   </div>
-                  <button 
-                    onClick={() => setShowPayModal(true)}
-                    className="flex-[1.5] bg-green-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-green-700 shadow-xl shadow-green-100 transition-all"
-                  >
-                    <CheckCircle size={18}/> Procesar Cierre
+                  <button onClick={() => setShowPayModal(true)} className="flex-[1.5] bg-green-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-green-700 shadow-xl shadow-green-100 transition-all">
+                    <CheckCircle size={18}/> {calculateBalance() > 0 ? 'Liquidar y Entregar' : 'Finalizar Entrega'}
                   </button>
                 </div>
               )}
@@ -370,7 +467,46 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             <ClipboardList size={64} className="text-slate-300 opacity-50" />
           </div>
           <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Reparaciones</h4>
-          <p className="mt-2 text-slate-500 text-center font-medium max-w-sm px-6">Localice un vehículo por placa para gestionar sus estados, cargos y cierre definitivo de orden.</p>
+          <p className="mt-2 text-slate-500 text-center font-medium max-w-sm px-6">Localice un vehículo por placa para gestionar sus estados, cargos, abonos y cierre definitivo.</p>
+        </div>
+      )}
+
+      {/* Abono Modal */}
+      {showAbonoModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10">
+            <h3 className="text-2xl font-black text-slate-800 mb-6 uppercase tracking-tighter">Registrar Abono</h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto del Abono ($)</label>
+                 <input 
+                  type="number" 
+                  step="0.01"
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-2xl text-blue-600 outline-none focus:ring-4 focus:ring-blue-50"
+                  value={abonoAmount}
+                  onChange={(e) => setAbonoAmount(Number(e.target.value))}
+                  autoFocus
+                />
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Saldo Pendiente: ${calculateBalance().toFixed(2)}</p>
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Método de Pago</label>
+                 <select 
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest outline-none"
+                  value={abonoMethod}
+                  onChange={(e) => setAbonoMethod(e.target.value as PaymentMethod)}
+                >
+                  {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-4 pt-4">
+                 <button onClick={() => setShowAbonoModal(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest">Cancelar</button>
+                 <button onClick={registerAbono} className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100">Confirmar Pago</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -385,14 +521,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <input 
                   type="text" 
                   placeholder="Buscar repuesto..." 
-                  className="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+                  className="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl outline-none focus:ring-4 focus:ring-blue-50 font-bold"
                   value={invSearchTerm}
                   onChange={(e) => setInvSearchTerm(e.target.value)}
                   autoFocus
                 />
               </div>
             </div>
-            
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
               {filteredInventory.map((p: Product) => (
                 <button 
@@ -411,31 +546,27 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </button>
               ))}
             </div>
-
             <div className="p-6 border-t flex gap-3">
-              <button onClick={() => setShowInventorySearch(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600">Cancelar</button>
+              <button onClick={() => setShowInventorySearch(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest">Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Final Modal */}
       {showPayModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
             <div className="w-24 h-24 bg-green-100 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3">
               <CheckCircle size={48} />
             </div>
-            <h3 className="text-3xl font-black mb-2 text-slate-800 uppercase tracking-tighter">Confirmar Cierre</h3>
-            <p className="text-slate-500 mb-8 font-medium italic">Se registrará el pago por <strong>{tempPaymentMethod}</strong> y se cerrará la orden de forma definitiva.</p>
-            
-            <button 
-              onClick={finalizeRepair}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all mb-4"
-            >
-              Confirmar y Finalizar
+            <h3 className="text-3xl font-black mb-2 text-slate-800 uppercase tracking-tighter">Cierre de Orden</h3>
+            <p className="text-slate-500 mb-8 font-medium italic">
+              Se registrará el pago final de <strong>${calculateBalance().toFixed(2)}</strong> por <strong>{tempPaymentMethod}</strong> y se entregará el vehículo.
+            </p>
+            <button onClick={finalizeRepair} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all mb-4">
+              Confirmar Liquidación y Entrega
             </button>
-
             <button onClick={() => setShowPayModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-all">Regresar</button>
           </div>
         </div>

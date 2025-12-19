@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   UserRound, 
   Plus, 
@@ -18,22 +18,42 @@ import {
   ArrowRight,
   Filter,
   X,
-  Wrench
+  Wrench,
+  ChevronDown
 } from 'lucide-react';
 import { Customer, VehicleRepair, Sale } from '../types';
 
 const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'repairs' | 'sales'>('repairs');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '' });
   const [plateFilter, setPlateFilter] = useState<string | null>(null);
 
-  const filteredCustomers = store.customers.filter((c: Customer) => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
-  );
+  // Estados para filtros avanzados
+  const [filters, setFilters] = useState({
+    address: '',
+    dateStart: '',
+    dateEnd: ''
+  });
+
+  const filteredCustomers = useMemo(() => {
+    return store.customers.filter((c: Customer) => {
+      const matchSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          c.phone.includes(searchTerm);
+      
+      const matchAddress = !filters.address || 
+                           (c.address?.toLowerCase().includes(filters.address.toLowerCase()));
+      
+      const customerDate = c.createdAt.split('T')[0];
+      const matchDateStart = !filters.dateStart || customerDate >= filters.dateStart;
+      const matchDateEnd = !filters.dateEnd || customerDate <= filters.dateEnd;
+
+      return matchSearch && matchAddress && matchDateStart && matchDateEnd;
+    });
+  }, [store.customers, searchTerm, filters]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +101,11 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
     setActiveTab('repairs');
   };
 
+  const clearFilters = () => {
+    setFilters({ address: '', dateStart: '', dateEnd: '' });
+    setSearchTerm('');
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       <div className="flex justify-between items-center mb-8">
@@ -89,15 +114,24 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-slate-500 font-medium">Directorio estratégico y analíticas de lealtad de Gonzacars</p>
         </div>
         <div className="flex gap-4">
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre o teléfono..." 
-              className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm shadow-sm font-medium"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm h-fit">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+              <input 
+                type="text" 
+                placeholder="Nombre o Teléfono..." 
+                className="w-full pl-10 pr-4 py-2 bg-transparent outline-none text-sm font-medium"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`p-2 rounded-xl transition-all ${showAdvancedFilters || filters.address || filters.dateStart ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
+              title="Filtros Avanzados"
+            >
+              <Filter size={20}/>
+            </button>
           </div>
           <button 
             onClick={() => setShowAddModal(true)} 
@@ -108,11 +142,62 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
         </div>
       </div>
 
+      {/* Panel de Filtros Avanzados */}
+      {showAdvancedFilters && (
+        <div className="mb-8 bg-white p-6 rounded-[2rem] border border-blue-100 shadow-xl shadow-blue-50/50 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Filter size={14}/> Parámetros de Búsqueda Avanzada
+            </h4>
+            <button onClick={clearFilters} className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">Limpiar Todo</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <MapPin size={10}/> Dirección / Ubicación
+              </label>
+              <input 
+                type="text" 
+                placeholder="Ej: Urb. Los Olivos..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                value={filters.address}
+                onChange={(e) => setFilters({...filters, address: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <Calendar size={10}/> Registrado Desde
+              </label>
+              <input 
+                type="date" 
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                value={filters.dateStart}
+                onChange={(e) => setFilters({...filters, dateStart: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <Calendar size={10}/> Registrado Hasta
+              </label>
+              <input 
+                type="date" 
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                value={filters.dateEnd}
+                onChange={(e) => setFilters({...filters, dateEnd: e.target.value})}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 overflow-hidden">
         {/* Sidebar: Lista de Clientes */}
         <div className="lg:col-span-4 bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm flex flex-col">
           <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
             <span className="font-black text-slate-400 text-[10px] uppercase tracking-widest">Base de Datos ({filteredCustomers.length})</span>
+            {(searchTerm || filters.address || filters.dateStart) && (
+              <span className="text-[8px] font-black text-blue-500 uppercase bg-blue-50 px-2 py-0.5 rounded-full">Filtrado</span>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
             {filteredCustomers.map((c: Customer) => (
@@ -133,6 +218,12 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
                 <ArrowRight size={16} className={`text-slate-300 transition-transform ${selectedCustomer?.id === c.id ? 'translate-x-1 text-blue-400' : ''}`} />
               </button>
             ))}
+            {filteredCustomers.length === 0 && (
+              <div className="p-10 text-center flex flex-col items-center">
+                <Search size={32} className="text-slate-200 mb-2"/>
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No hay coincidencias</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -155,6 +246,11 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
                       <span className="flex items-center gap-1.5 text-slate-500 text-[10px] font-black uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
                         <Mail size={14} className="text-blue-500"/> {selectedCustomer.email || 'Sin correo'}
                       </span>
+                      {selectedCustomer.address && (
+                        <span className="flex items-center gap-1.5 text-slate-500 text-[10px] font-black uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 max-w-xs truncate">
+                          <MapPin size={14} className="text-blue-500"/> {selectedCustomer.address}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

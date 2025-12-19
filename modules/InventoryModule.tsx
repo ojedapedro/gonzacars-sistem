@@ -21,6 +21,10 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     setEditingId(null);
   };
 
+  const handleQuantityUpdate = (id: string, val: number) => {
+    store.updateInventoryQuantity(id, val);
+  };
+
   const handleBarcodeUpdate = (id: string) => {
     store.updateBarcode(id, newBarcode);
     setEditingBarcodeId(null);
@@ -55,7 +59,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
             <tr className="bg-slate-50 text-left border-b border-slate-200">
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Código</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Producto</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Cant.</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Stock (Editar)</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Costo ($)</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Precio Venta ($)</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-center">Acciones</th>
@@ -90,10 +94,15 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                   <div className="text-xs text-slate-500 font-medium uppercase">{p.category}</div>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.quantity <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                    {p.quantity}
-                  </span>
-                  {p.quantity <= 5 && <AlertCircle size={14} className="inline ml-1 text-red-500" />}
+                  <div className="flex items-center justify-center gap-2">
+                    <input 
+                      type="number" 
+                      className={`w-16 px-2 py-1 border rounded-lg text-sm font-black text-center outline-none transition-all ${p.quantity <= 5 ? 'bg-red-50 border-red-200 text-red-600 focus:ring-2 focus:ring-red-500' : 'bg-green-50 border-green-200 text-green-600 focus:ring-2 focus:ring-green-500'}`}
+                      value={p.quantity}
+                      onChange={(e) => handleQuantityUpdate(p.id, Number(e.target.value))}
+                    />
+                    {p.quantity <= 5 && <AlertCircle size={14} className="text-red-500" />}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-right font-medium text-slate-400">${p.cost.toFixed(2)}</td>
                 <td className="px-6 py-4 text-right">

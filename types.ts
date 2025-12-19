@@ -25,27 +25,36 @@ export interface Product {
 
 export interface RepairItem {
   id: string;
+  productId?: string;
   type: 'Repuesto' | 'Consumible' | 'Servicio';
   description: string;
   quantity: number;
   price: number;
 }
 
+export interface Installment {
+  id: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+}
+
 export interface VehicleRepair {
   id: string;
-  customerId: string; // Vinculación con cliente
+  customerId: string;
   plate: string;
   brand: string;
   model: string;
   year: number;
-  ownerName: string; // Para compatibilidad rápida
+  ownerName: string;
   responsible: string;
   status: ServiceStatus;
   diagnosis: string;
   serviceType: string;
   mechanicId: string;
-  evidencePhotos?: string[]; // Cambiado de evidencePhoto a un array de strings (base64)
+  evidencePhotos?: string[];
   items: RepairItem[];
+  installments?: Installment[]; // Nuevo: Lista de pagos parciales
   createdAt: string;
   finishedAt?: string;
   paymentMethod?: PaymentMethod;
@@ -53,7 +62,7 @@ export interface VehicleRepair {
 
 export interface Sale {
   id: string;
-  customerId?: string; // Vinculación con cliente
+  customerId?: string;
   date: string;
   customerName: string;
   items: { productId: string; name: string; price: number; quantity: number }[];
