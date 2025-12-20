@@ -20,7 +20,10 @@ import {
   Clock,
   ArrowUpRight,
   Receipt,
-  Percent
+  Percent,
+  Tag,
+  BarChart3,
+  Package
 } from 'lucide-react';
 import { Product, PaymentMethod, Sale, Customer } from '../types';
 
@@ -53,6 +56,11 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
   );
 
   const addToCart = (product: Product) => {
+    // Si hay un carrito nuevo, limpiamos la referencia visual de la última venta del modal rápido
+    if (cart.length === 0) {
+      // Opcional: podríamos mantener lastSale pero aquí aseguramos que el foco sea la nueva venta
+    }
+    
     const existing = cart.find(item => item.product.id === product.id);
     if (existing) {
       if (existing.quantity >= product.quantity) return;
@@ -116,6 +124,8 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
     const totalUSD = todaySales.reduce((acc: number, s: Sale) => acc + Number(s.total || 0), 0);
     const totalBS = totalUSD * Number(store.exchangeRate || 0);
 
+    const itemsSold = todaySales.flatMap(s => s.items).reduce((acc: number, item) => acc + item.quantity, 0);
+
     const itemsCount = todaySales.flatMap(s => s.items).reduce((acc: any, item) => {
       acc[item.name] = (acc[item.name] || 0) + item.quantity;
       return acc;
@@ -126,7 +136,18 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
 
-    return { totalsByMethod, totalUSD, totalBS, count: todaySales.length, topItems, todaySales };
+    const ticketPromedio = todaySales.length > 0 ? totalUSD / todaySales.length : 0;
+
+    return { 
+      totalsByMethod, 
+      totalUSD, 
+      totalBS, 
+      count: todaySales.length, 
+      topItems, 
+      todaySales,
+      itemsSold,
+      ticketPromedio 
+    };
   };
 
   const handlePrint = () => {
@@ -200,13 +221,24 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Facturación Directa</p>
               </div>
             </div>
-            <button 
-              onClick={() => setShowDailyReport(true)}
-              className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-100"
-              title="Reporte de Caja Diario"
-            >
-              <ClipboardList size={22} />
-            </button>
+            <div className="flex gap-2">
+              {lastSale && (
+                <button 
+                  onClick={() => setShowReceiptModal(true)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all border border-blue-100"
+                  title="Re-imprimir última venta"
+                >
+                  <FileText size={20} />
+                </button>
+              )}
+              <button 
+                onClick={() => setShowDailyReport(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all border border-slate-100"
+                title="Reporte de Caja Diario"
+              >
+                <ClipboardList size={22} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-4 mb-6 custom-scrollbar pr-2">
@@ -394,14 +426,14 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-white/30 backdrop-blur-md rotate-6 p-3">
                   <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
                </div>
-               <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Venta Exitosa</h3>
+               <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Venta Procesada</h3>
                <p className="text-emerald-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3 opacity-80">Comprobante #{lastSale.id}</p>
             </div>
             
             <div className="p-10">
                <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 space-y-5 mb-10">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Cancelado</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Facturado</span>
                     <span className="text-3xl font-black text-slate-900 tracking-tighter">${Number(lastSale.total).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-slate-200 pt-5">
@@ -409,23 +441,23 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                     <span className="text-xl font-black text-emerald-600 tracking-tight">{(Number(lastSale.total) * Number(store.exchangeRate)).toLocaleString('es-VE')} Bs</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Medio de Pago</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Método</span>
                     <span className="text-[10px] font-black uppercase bg-white px-4 py-1.5 rounded-xl border border-slate-200 shadow-sm">{lastSale.paymentMethod}</span>
                   </div>
                </div>
 
-               <div className="flex gap-4">
-                  <button 
-                    onClick={() => { setShowReceiptModal(false); setLastSale(null); }}
-                    className="flex-1 py-5 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors"
-                  >
-                    Cerrar
-                  </button>
+               <div className="flex flex-col gap-3">
                   <button 
                     onClick={handlePrint}
-                    className="flex-[2] bg-blue-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all active:scale-95"
+                    className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all active:scale-95"
                   >
-                    <Printer size={18}/> Imprimir Ticket
+                    <Printer size={18}/> Imprimir Ticket de Venta
+                  </button>
+                  <button 
+                    onClick={() => setShowReceiptModal(false)}
+                    className="w-full py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors"
+                  >
+                    Cerrar Ventana
                   </button>
                </div>
             </div>
@@ -434,24 +466,27 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
       )}
 
       {showDailyReport && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 no-print">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-8 duration-500">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 no-print">
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-5xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-8 duration-500 border border-slate-200">
+            {/* Header Reporte */}
             <div className="p-10 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-5">
-                 <TrendingUp size={160} />
+                 <BarChart3 size={160} />
               </div>
               <div className="relative z-10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                    <ClipboardList size={22} />
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <ClipboardList size={24} />
                   </div>
-                  <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Arqueo de Caja</h3>
+                  <div>
+                    <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Arqueo de Caja Diario</h3>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+                      <Clock size={12}/> {new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-3 flex items-center gap-2">
-                  <Clock size={12}/> {new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
               </div>
-              <button onClick={() => setShowDailyReport(false)} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl transition-all relative z-10">
+              <button onClick={() => setShowDailyReport(false)} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl transition-all relative z-10 border border-white/5">
                 <X size={24} />
               </button>
             </div>
@@ -461,80 +496,123 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                 const report = getDailyTotals();
                 return (
                   <div className="space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ingreso Total Diario</p>
+                    {/* Tarjetas Principales */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative group">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ingreso Bruto (USD)</p>
                         <div className="flex items-baseline gap-2">
                           <span className="text-4xl font-black text-slate-900 tracking-tighter">${Number(report.totalUSD).toFixed(2)}</span>
                           <ArrowUpRight size={20} className="text-emerald-500" />
                         </div>
-                        <p className="text-xs font-black text-emerald-600 mt-2">
-                          {Number(report.totalBS).toLocaleString('es-VE')} Bs <span className="text-[9px] text-slate-400 opacity-60">@ {store.exchangeRate}</span>
-                        </p>
-                      </div>
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Transacciones</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-blue-600 tracking-tighter">{report.count}</span>
-                          <Receipt size={20} className="text-blue-200" />
+                        <div className="mt-4 pt-4 border-t border-slate-50">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase">Equivalente en Bolívares</p>
+                          <p className="text-xl font-black text-emerald-700 tracking-tight">{Number(report.totalBS).toLocaleString('es-VE')} Bs</p>
                         </div>
-                        <p className="text-xs font-black text-slate-400 mt-2 uppercase tracking-widest">Órdenes Finalizadas</p>
                       </div>
-                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl shadow-slate-900/20 relative overflow-hidden">
-                        <DollarSign className="absolute -bottom-4 -right-4 text-white/5" size={120} />
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Fondo Sugerido</p>
-                        <span className="text-4xl font-black tracking-tighter">$100.00</span>
-                        <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase italic">Base para apertura de caja</p>
+
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ticket Promedio</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-black text-blue-600 tracking-tighter">${report.ticketPromedio.toFixed(2)}</span>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-50">
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Volumen de Transacciones</p>
+                          <p className="text-xl font-black text-slate-900">{report.count} Ventas</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Artículos Vendidos</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-black text-purple-600 tracking-tighter">{report.itemsSold}</span>
+                          <Tag size={20} className="text-purple-200" />
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-50">
+                          <p className="text-[10px] font-black text-slate-400 uppercase">En Inventario Restado</p>
+                          <p className="text-xl font-black text-slate-900">Unidades Totales</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-slate-900/20 relative overflow-hidden flex flex-col justify-between">
+                        <DollarSign className="absolute -bottom-4 -right-4 text-white/5" size={140} />
+                        <div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tasa de Cambio</p>
+                          <p className="text-2xl font-black tracking-tight text-blue-400">{store.exchangeRate.toFixed(2)} Bs/$</p>
+                        </div>
+                        <div className="mt-auto">
+                           <p className="text-[9px] font-bold text-slate-400 uppercase italic leading-tight">Valor utilizado para todas las conversiones de este reporte.</p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                          <Wallet size={20} className="text-blue-500" />
-                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Desglose por Método</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                      {/* Desglose por Método */}
+                      <div className="lg:col-span-7 space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Wallet size={18} className="text-blue-500" /> Desglose por Método de Pago
+                          </h4>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">Auditoría Multi-divisa</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map((method) => {
                             const amount = Number(report.totalsByMethod[method] || 0);
+                            const amountBs = amount * Number(store.exchangeRate);
                             return (
-                              <div key={method} className="bg-white p-5 rounded-[2rem] border border-slate-100 hover:shadow-lg transition-all group">
-                                <div className="flex justify-between items-start mb-3">
-                                  <span className="font-black text-slate-800 text-[10px] uppercase tracking-tighter">{method}</span>
-                                  <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                                    <ArrowUpRight size={12} />
+                              <div key={method} className="bg-white p-6 rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group border-l-4 border-l-transparent hover:border-l-blue-600">
+                                <div className="flex justify-between items-start mb-4">
+                                  <span className="font-black text-slate-800 text-[11px] uppercase tracking-tighter">{method}</span>
+                                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                    <Receipt size={14} />
                                   </div>
                                 </div>
-                                <p className="font-black text-slate-900 text-xl tracking-tighter">${amount.toFixed(2)}</p>
-                                <p className="text-[9px] font-black text-emerald-600 mt-0.5">
-                                  {(amount * Number(store.exchangeRate)).toLocaleString('es-VE')} Bs
-                                </p>
+                                <div className="space-y-1">
+                                  <p className="font-black text-slate-950 text-2xl tracking-tighter">${amount.toFixed(2)}</p>
+                                  <p className="text-xs font-black text-emerald-600">
+                                    {amountBs.toLocaleString('es-VE')} Bs
+                                  </p>
+                                </div>
                               </div>
                             );
                           })}
                         </div>
                       </div>
 
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                          <TrendingUp size={20} className="text-blue-500" />
-                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Top Productos Hoy</h4>
+                      {/* Top Productos Refinado */}
+                      <div className="lg:col-span-5 space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <TrendingUp size={18} className="text-blue-500" /> Repuestos Más Vendidos
+                          </h4>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">Top 5</span>
                         </div>
-                        <div className="bg-white rounded-[2rem] border border-slate-100 p-6 space-y-4 shadow-sm">
-                          {report.topItems.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center group">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                  {idx + 1}
+                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-6 shadow-sm">
+                          {report.topItems.map((item, idx) => {
+                            const percentage = (item.qty / report.itemsSold) * 100;
+                            return (
+                              <div key={idx} className="space-y-2 group">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-[10px] font-black text-white group-hover:bg-blue-600 transition-all">
+                                      {idx + 1}
+                                    </div>
+                                    <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[200px]">{item.name}</span>
+                                  </div>
+                                  <span className="font-black text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full whitespace-nowrap">{item.qty} unid.</span>
                                 </div>
-                                <span className="font-bold text-slate-700 text-xs uppercase truncate max-w-[180px]">{item.name}</span>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                   <div 
+                                    className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                                    style={{ width: `${percentage}%` }}
+                                   />
+                                </div>
                               </div>
-                              <span className="font-black text-blue-600 text-xs px-3 py-1 bg-blue-50 rounded-full">{item.qty} unid.</span>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {report.topItems.length === 0 && (
-                            <div className="text-center py-10 opacity-30">
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sin datos de venta</p>
+                            <div className="text-center py-16 opacity-30 flex flex-col items-center">
+                              <Package size={48} className="mb-4" />
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sin datos de salida hoy</p>
                             </div>
                           )}
                         </div>
@@ -545,12 +623,13 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
               })()}
             </div>
 
+            {/* Footer Reporte */}
             <div className="p-8 bg-white border-t border-slate-100 flex gap-4 no-print">
               <button 
                 onClick={() => window.print()}
-                className="flex-1 bg-slate-950 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.3em] hover:bg-black transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3"
+                className="flex-1 bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-[11px] tracking-[0.3em] hover:bg-black transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3"
               >
-                <Printer size={20} /> Generar Reporte de Cierre
+                <Printer size={20} /> Generar Reporte de Cierre para Contabilidad
               </button>
             </div>
           </div>

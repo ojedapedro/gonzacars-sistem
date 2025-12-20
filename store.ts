@@ -33,20 +33,34 @@ export const useGonzacarsStore = () => {
   };
 
   const login = (username: string, pass: string): boolean => {
-    if (users.length === 0 && username === 'admin' && pass === 'admin') {
-       const adminUser: User = { id: 'default', username: 'admin', name: 'Administrador Base', role: 'administrador' };
-       setCurrentUser(adminUser);
-       localStorage.setItem('gz_active_user', JSON.stringify(adminUser));
-       return true;
-    }
+    // 1. Intentar buscar en la lista de usuarios cargados desde la base de datos
+    const found = users.find(u => 
+      u.username && 
+      u.username.toLowerCase() === username.toLowerCase() && 
+      u.password === pass
+    );
 
-    const found = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === pass);
     if (found) {
       const { password, ...userWithoutPass } = found;
       setCurrentUser(userWithoutPass as User);
       localStorage.setItem('gz_active_user', JSON.stringify(userWithoutPass));
       return true;
     }
+
+    // 2. Fallback de recuperación: Solo si la lista está vacía o no hay URL (primer inicio)
+    // También permite admin/admin si es la primera vez que se accede
+    if ((users.length === 0 || !sheetsUrl) && username.toLowerCase() === 'admin' && pass === 'admin') {
+       const adminUser: User = { 
+         id: 'default-admin', 
+         username: 'admin', 
+         name: 'Administrador de Recuperación', 
+         role: 'administrador' 
+       };
+       setCurrentUser(adminUser);
+       localStorage.setItem('gz_active_user', JSON.stringify(adminUser));
+       return true;
+    }
+
     return false;
   };
 
@@ -62,7 +76,13 @@ export const useGonzacarsStore = () => {
       const response = await fetch(sheetsUrl);
       const data = await response.json();
       
-      if (Array.isArray(data.Users)) setUsers(data.Users);
+      if (Array.isArray(data.Users)) {
+        setUsers(data.Users.map((u: any) => ({
+          ...u,
+          password: u.password ? String(u.password) : '' // Asegurar que el password sea string
+        })));
+      }
+      
       if (Array.isArray(data.Customers)) setCustomers(data.Customers);
       
       if (Array.isArray(data.Inventory)) {
@@ -208,7 +228,6 @@ export const useGonzacarsStore = () => {
     setPurchases(prev => [...prev, purchase]);
     syncRow('Purchases', 'add', purchase);
     
-    // Todas las compras (Pendientes y Cerradas) actualizan el inventario
     const existing = inventory.find(p => p.id === purchase.productId || p.name === purchase.productName);
     if (existing) {
       const updated = { 
