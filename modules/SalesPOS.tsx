@@ -347,8 +347,8 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
           <div className="text-center mb-6">
             <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain" />
             <h1 className="text-xl font-black uppercase tracking-tighter">Gonzacars C.A.</h1>
-            <p className="text-[10px] font-bold uppercase tracking-widest">R.I.F. J-12345678-9</p>
-            <p className="text-[8px] font-medium leading-tight">Sector El Chamo, Calle Principal<br/>Puerto Ordaz, Bolívar</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest">R.I.F. J-50030426-9</p>
+            <p className="text-[8px] font-medium leading-tight">Av. Bolivar norte; Calle Miranda, Local 113-109C<br/>Valencia 2001, Carabobo</p>
           </div>
 
           <div className="border-y-2 border-dashed border-slate-900 py-3 mb-4 text-[10px]">

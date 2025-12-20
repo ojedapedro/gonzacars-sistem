@@ -279,7 +279,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter">Gonzacars C.A.</h1>
               <p className="text-sm font-bold">ESTADO DE CUENTA DE CLIENTE</p>
-              <p className="text-[10px]">Puerto Ordaz, Bolívar | J-12345678-9</p>
+              <p className="text-[10px]">Valencia, Edo. Carabobo | RIF: J-50030426-9</p>
             </div>
           </div>
           <div className="text-right">
@@ -346,8 +346,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         <div className="hidden print:block print-only bg-white text-slate-900 p-8 w-full max-w-[80mm] mx-auto text-center border border-slate-200">
            <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain grayscale" />
            <h2 className="text-lg font-black uppercase tracking-tighter">Gonzacars C.A.</h2>
-           <p className="text-[10px] font-bold">RIF: J-12345678-9</p>
-           <p className="text-[9px] mb-4">Pto. Ordaz, Edo. Bolívar</p>
+           <p className="text-[10px] font-bold">RIF: J-50030426-9</p>
+           <p className="text-[9px] mb-4">Av. Bolivar norte; Calle Miranda, Valencia, Carabobo</p>
            
            <div className="border-y-2 border-dashed border-slate-400 py-3 mb-4 text-[11px] text-left">
               <p className="font-black text-center mb-2 underline">COMPROBANTE DE ABONO</p>
@@ -402,8 +402,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               <img src={LOGO_URL} alt="Logo" className="w-16 h-16 object-contain" />
               <div>
                 <h1 className="text-xl font-black uppercase tracking-tighter">Gonzacars C.A.</h1>
-                <p className="font-bold">RIF: J-12345678-9</p>
-                <p>Puerto Ordaz, Edo. Bolívar, Venezuela.</p>
+                <p className="font-bold">RIF: J-50030426-9</p>
+                <p>Av. Bolivar norte; Calle Miranda, Local 113-109C, Valencia 2001, Carabobo.</p>
                 <p>Tel: (0412) 000-0000 | @gonzacars.ca</p>
               </div>
             </div>
@@ -740,7 +740,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   <Printer size={24}/> Imprimir PDF Informe Técnico
                 </button>
                 {currentRepair.status !== 'Entregado' && (
-                  <button onClick={() => setShowPayModal(true)} className="flex-1 bg-blue-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95">
+                  <button onClick={() => setShowPayModal(true)} className="flex-1 bg-blue-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all active:scale-95">
                     <CheckCircle size={24}/> Liquidar y Entregar
                   </button>
                 )}
@@ -793,7 +793,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </button>
                   <button 
                     onClick={() => setShowReceiptModal(false)}
-                    className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors"
+                    className="w-full py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors"
                   >
                     Cerrar Ventana
                   </button>

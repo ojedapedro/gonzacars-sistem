@@ -2,6 +2,7 @@
 /**
  * GOOGLE SHEETS DATABASE SCRIPT - GONZACARS C.A.
  * ID: 1L-Fmfey-8ZR6vgF5DVR6B5fiSLbVYo7YDs7pIuBxmEU
+ * RIF: J-50030426-9
  */
 
 const SPREADSHEET_ID = '1L-Fmfey-8ZR6vgF5DVR6B5fiSLbVYo7YDs7pIuBxmEU';
@@ -41,7 +42,7 @@ function setupDatabase() {
   const settings = ss.getSheetByName('Settings');
   settings.appendRow(['exchangeRate', '45.00']);
   
-  return "Base de datos inicializada correctamente con usuarios por defecto.";
+  return "Base de datos inicializada correctamente con usuarios por defecto para RIF J-50030426-9.";
 }
 
 function doGet(e) {
