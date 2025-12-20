@@ -19,7 +19,8 @@ import {
   Filter,
   X,
   Wrench,
-  ChevronDown
+  ChevronDown,
+  User
 } from 'lucide-react';
 import { Customer, VehicleRepair, Sale } from '../types';
 
@@ -34,6 +35,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
 
   // Estados para filtros avanzados
   const [filters, setFilters] = useState({
+    nameExact: '',
     address: '',
     dateStart: '',
     dateEnd: ''
@@ -44,6 +46,9 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
       const matchSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           c.phone.includes(searchTerm);
       
+      // Filtro sensible a mayúsculas y minúsculas (Case-Sensitive)
+      const matchNameExact = !filters.nameExact || c.name.includes(filters.nameExact);
+      
       const matchAddress = !filters.address || 
                            (c.address?.toLowerCase().includes(filters.address.toLowerCase()));
       
@@ -51,7 +56,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
       const matchDateStart = !filters.dateStart || customerDate >= filters.dateStart;
       const matchDateEnd = !filters.dateEnd || customerDate <= filters.dateEnd;
 
-      return matchSearch && matchAddress && matchDateStart && matchDateEnd;
+      return matchSearch && matchNameExact && matchAddress && matchDateStart && matchDateEnd;
     });
   }, [store.customers, searchTerm, filters]);
 
@@ -102,7 +107,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
   };
 
   const clearFilters = () => {
-    setFilters({ address: '', dateStart: '', dateEnd: '' });
+    setFilters({ nameExact: '', address: '', dateStart: '', dateEnd: '' });
     setSearchTerm('');
   };
 
@@ -127,7 +132,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
             </div>
             <button 
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`p-2 rounded-xl transition-all ${showAdvancedFilters || filters.address || filters.dateStart ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
+              className={`p-2 rounded-xl transition-all ${showAdvancedFilters || filters.address || filters.dateStart || filters.nameExact ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
               title="Filtros Avanzados"
             >
               <Filter size={20}/>
@@ -151,7 +156,19 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
             </h4>
             <button onClick={clearFilters} className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">Limpiar Todo</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <User size={10}/> Nombre (Sensible a Mayús.)
+              </label>
+              <input 
+                type="text" 
+                placeholder="Ej: Juan (no juan)..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                value={filters.nameExact}
+                onChange={(e) => setFilters({...filters, nameExact: e.target.value})}
+              />
+            </div>
             <div className="space-y-1.5">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
                 <MapPin size={10}/> Dirección / Ubicación
@@ -195,7 +212,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
         <div className="lg:col-span-4 bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm flex flex-col">
           <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
             <span className="font-black text-slate-400 text-[10px] uppercase tracking-widest">Base de Datos ({filteredCustomers.length})</span>
-            {(searchTerm || filters.address || filters.dateStart) && (
+            {(searchTerm || filters.address || filters.dateStart || filters.nameExact) && (
               <span className="text-[8px] font-black text-blue-500 uppercase bg-blue-50 px-2 py-0.5 rounded-full">Filtrado</span>
             )}
           </div>
