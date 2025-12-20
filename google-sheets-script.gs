@@ -40,7 +40,7 @@ function setupDatabase() {
 
   // Valor inicial de tasa si no existe
   const settings = ss.getSheetByName('Settings');
-  settings.appendRow(['exchangeRate', '45.00']);
+  settings.appendRow(['exchangeRate', '0']);
   
   return "Base de datos inicializada correctamente con usuarios por defecto para RIF J-50030426-9.";
 }

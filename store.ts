@@ -17,7 +17,7 @@ export const useGonzacarsStore = () => {
   });
   
   const [users, setUsers] = useState<User[]>([]);
-  const [exchangeRate, setExchangeRate] = useState<number>(45.0);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [inventory, setInventory] = useState<Product[]>([]);
   const [repairs, setRepairs] = useState<VehicleRepair[]>([]);
