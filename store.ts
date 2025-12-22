@@ -17,7 +17,7 @@ export const useGonzacarsStore = () => {
   });
   
   const [users, setUsers] = useState<User[]>([]);
-  const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [exchangeRate, setExchangeRate] = useState<number>(45.0);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [inventory, setInventory] = useState<Product[]>([]);
   const [repairs, setRepairs] = useState<VehicleRepair[]>([]);
@@ -27,13 +27,28 @@ export const useGonzacarsStore = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
 
+  // Detectar configuración por URL (para abrir en otros dispositivos fácilmente)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const configUrl = params.get('config_db');
+    if (configUrl) {
+      const decoded = decodeURIComponent(configUrl);
+      if (decoded.startsWith('https://script.google.com')) {
+        saveUrl(decoded);
+        // Limpiar URL para estética
+        window.history.replaceState({}, document.title, window.location.pathname);
+        alert("¡Configuración de base de datos importada con éxito!");
+      }
+    }
+  }, []);
+
   const saveUrl = (url: string) => {
-    localStorage.setItem('gz_sheets_url', url);
-    setSheetsUrl(url);
+    const cleanUrl = url.trim();
+    localStorage.setItem('gz_sheets_url', cleanUrl);
+    setSheetsUrl(cleanUrl);
   };
 
   const login = (username: string, pass: string): boolean => {
-    // 1. Intentar buscar en la lista de usuarios cargados desde la base de datos
     const found = users.find(u => 
       u.username && 
       u.username.toLowerCase() === username.toLowerCase() && 
@@ -47,8 +62,6 @@ export const useGonzacarsStore = () => {
       return true;
     }
 
-    // 2. Fallback de recuperación: Solo si la lista está vacía o no hay URL (primer inicio)
-    // También permite admin/admin si es la primera vez que se accede
     if ((users.length === 0 || !sheetsUrl) && username.toLowerCase() === 'admin' && pass === 'admin') {
        const adminUser: User = { 
          id: 'default-admin', 
@@ -70,16 +83,17 @@ export const useGonzacarsStore = () => {
   };
 
   const refreshData = async () => {
-    if (!sheetsUrl) return;
+    if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     setLoading(true);
     try {
       const response = await fetch(sheetsUrl);
+      if (!response.ok) throw new Error("Error en red");
       const data = await response.json();
       
       if (Array.isArray(data.Users)) {
         setUsers(data.Users.map((u: any) => ({
           ...u,
-          password: u.password ? String(u.password) : '' // Asegurar que el password sea string
+          password: u.password ? String(u.password) : '' 
         })));
       }
       
@@ -161,7 +175,7 @@ export const useGonzacarsStore = () => {
   }, [sheetsUrl]);
 
   const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete', data: any) => {
-    if (!sheetsUrl) return;
+    if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     try {
       await fetch(sheetsUrl, {
         method: 'POST',

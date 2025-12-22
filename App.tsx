@@ -19,7 +19,12 @@ import {
   ChevronRight,
   ShieldCheck,
   TrendingUp,
-  Coins
+  Coins,
+  Share2,
+  Copy,
+  Smartphone,
+  ExternalLink,
+  CheckCircle2
 } from 'lucide-react';
 import { useGonzacarsStore } from './store';
 import RepairRegistration from './modules/RepairRegistration';
@@ -44,6 +49,7 @@ const App: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +76,69 @@ const App: React.FC = () => {
     }
     return false;
   };
+
+  const getShareLink = () => {
+    const baseUrl = window.location.href.split('?')[0];
+    return `${baseUrl}?config_db=${encodeURIComponent(store.sheetsUrl)}`;
+  };
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(getShareLink());
+    alert("¡Enlace de configuración copiado! Envíalo a tu otro dispositivo para abrir la app con tus datos.");
+  };
+
+  if (!store.sheetsUrl) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-900 p-6 overflow-y-auto">
+        <div className="w-full max-w-2xl bg-white/5 backdrop-blur-2xl rounded-[3rem] border border-white/10 p-12 text-white animate-in zoom-in duration-500">
+           <div className="text-center mb-10">
+              <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-blue-600/20">
+                <Database size={40} />
+              </div>
+              <h2 className="text-4xl font-black uppercase tracking-tighter">Bienvenido a Gonzacars</h2>
+              <p className="text-slate-400 mt-4 font-bold uppercase text-xs tracking-widest leading-relaxed">
+                Para comenzar en este dispositivo, necesitamos vincular tu base de datos de Google Sheets.
+              </p>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="bg-white/5 p-6 rounded-3xl border border-white/5 space-y-4">
+                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <Smartphone size={20} />
+                 </div>
+                 <h3 className="font-black uppercase text-sm tracking-tight">Si ya lo usas en otro PC</h3>
+                 <p className="text-xs text-slate-400 leading-relaxed">Entra en el Escritorio desde el otro PC, haz clic en <b>"Compartir Acceso"</b> y copia el enlace aquí.</p>
+              </div>
+              <div className="bg-white/5 p-6 rounded-3xl border border-white/5 space-y-4">
+                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-purple-400">
+                    <ExternalLink size={20} />
+                 </div>
+                 <h3 className="font-black uppercase text-sm tracking-tight">Si eres nuevo</h3>
+                 <p className="text-xs text-slate-400 leading-relaxed">Crea un Google Sheet, pega el script de la documentación y publica como "Aplicación Web".</p>
+              </div>
+           </div>
+
+           <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">URL de tu Apps Script</label>
+              <input 
+                type="text" 
+                className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:ring-4 focus:ring-blue-500/50 transition-all text-sm"
+                placeholder="https://script.google.com/macros/s/.../exec"
+                value={tempUrl}
+                onChange={(e) => setTempUrl(e.target.value)}
+              />
+              <button 
+                onClick={() => store.saveUrl(tempUrl)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-[0.2em] py-5 rounded-2xl shadow-2xl shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3"
+              >
+                Vincular Dispositivo <ChevronRight size={18}/>
+              </button>
+              <p className="text-center text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-6">Tu privacidad es total. No almacenamos tus credenciales en ningún servidor externo.</p>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!store.currentUser) {
     return (
@@ -126,6 +195,13 @@ const App: React.FC = () => {
             <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-blue-500/10 transition-all active:scale-95 group">
               Acceder al Sistema <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform"/>
             </button>
+            <button 
+              type="button"
+              onClick={() => store.saveUrl('')}
+              className="w-full text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors"
+            >
+              Cambiar Base de Datos
+            </button>
           </form>
         </div>
       </div>
@@ -133,16 +209,6 @@ const App: React.FC = () => {
   }
 
   const renderModule = () => {
-    if (!store.sheetsUrl && activeTab !== 'dashboard') {
-      return (
-        <div className="flex flex-col items-center justify-center h-full p-20 text-center">
-          <Database size={64} className="text-slate-300 mb-4" />
-          <h2 className="text-2xl font-bold text-slate-800">Conexión Requerida</h2>
-          <p className="text-slate-500 mt-2 max-w-md">Para utilizar los módulos, primero configura la URL de tu Google Apps Script en la sección de Escritorio.</p>
-        </div>
-      );
-    }
-
     switch (activeTab) {
       case 'customers': return <CustomerModule store={store} />;
       case 'repair-reg': return <RepairRegistration store={store} />;
@@ -161,14 +227,23 @@ const App: React.FC = () => {
               <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Panel de Control</h1>
               <p className="text-slate-500 font-medium mt-2 capitalize">Bienvenido, {store.currentUser?.name} ({store.currentUser?.role})</p>
             </div>
-            <button 
-                onClick={() => store.refreshData()} 
-                disabled={store.loading}
-                className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50"
-            >
-                <RefreshCw size={16} className={store.loading ? 'animate-spin' : ''}/> 
-                Sincronizar Datos
-            </button>
+            <div className="flex gap-3">
+              <button 
+                  onClick={() => setShowShareModal(true)} 
+                  className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-blue-600/20 text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors"
+              >
+                  <Share2 size={16}/> 
+                  Compartir Acceso
+              </button>
+              <button 
+                  onClick={() => store.refreshData()} 
+                  disabled={store.loading}
+                  className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                  <RefreshCw size={16} className={store.loading ? 'animate-spin' : ''}/> 
+                  Sincronizar
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -187,7 +262,6 @@ const App: React.FC = () => {
               value={store.customers.length.toString()}
               icon={<UserRound className="text-purple-500" />}
             />
-            {/* Tarjeta de Tasa de Cambio Manual */}
             <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
               <Coins className="absolute -bottom-6 -right-6 text-white/5 group-hover:scale-110 transition-transform" size={120} />
               <div className="relative z-10">
@@ -207,7 +281,6 @@ const App: React.FC = () => {
                     <RefreshCw size={20} />
                   </button>
                 </div>
-                <p className="mt-4 text-[9px] font-bold text-blue-400 uppercase italic">Afecta ventas y reportes financieros</p>
               </div>
             </div>
           </div>
@@ -247,9 +320,50 @@ const App: React.FC = () => {
                   >
                       Guardar Configuración
                   </button>
+                  <button 
+                      onClick={() => store.saveUrl('')}
+                      className="w-full py-4 text-red-500 font-black uppercase text-[9px] tracking-widest hover:bg-red-50 rounded-2xl transition-all"
+                  >
+                      Desvincular Base de Datos
+                  </button>
               </div>
             </div>
           </div>
+
+          {/* Modal de Compartir Acceso */}
+          {showShareModal && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-6 no-print">
+               <div className="bg-white rounded-[3rem] shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in duration-300">
+                  <div className="p-10 bg-blue-600 text-white text-center">
+                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/30 backdrop-blur-md">
+                      <Share2 size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">Compartir Acceso</h3>
+                    <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mt-2">Sincroniza otros dispositivos</p>
+                  </div>
+                  <div className="p-10 space-y-6">
+                    <p className="text-xs text-slate-500 font-bold leading-relaxed text-center">
+                      Copia este enlace y ábrelo en tu teléfono móvil o en el navegador de otro computador. La aplicación se configurará automáticamente con tu dirección actual.
+                    </p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 break-all text-[10px] font-mono text-blue-600">
+                       {getShareLink()}
+                    </div>
+                    <button 
+                      onClick={copyShareLink}
+                      className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3"
+                    >
+                      <Copy size={18}/> Copiar Enlace Mágico
+                    </button>
+                    <button 
+                      onClick={() => setShowShareModal(false)}
+                      className="w-full text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600"
+                    >
+                      Cerrar Ventana
+                    </button>
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
       );
     }
