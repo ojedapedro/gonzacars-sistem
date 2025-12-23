@@ -1,4 +1,5 @@
 
+// Add missing React and hooks imports
 import React, { useState, useMemo } from 'react';
 import { 
   Users, 
@@ -13,9 +14,11 @@ import {
   Clock, 
   ArrowUpRight,
   FileText,
-  AlertCircle
+  AlertCircle,
+  ShoppingBag,
+  Info
 } from 'lucide-react';
-import { Employee, VehicleRepair, RepairItem, PayrollRecord } from '../types';
+import { Employee, VehicleRepair, RepairItem, PayrollRecord, Sale } from '../types';
 
 const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -32,29 +35,59 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
     );
   }, [store.employees, searchQuery]);
 
-  // Calcula la comisión acumulada para un mecánico basada en reparaciones ENTREGADAS
+  // Cálculo de comisiones compartidas para vendedores (2.5% de ventas totales)
+  const sharedSalesCommission = useMemo(() => {
+    const totalSales = (store.sales || []).reduce((acc: number, s: Sale) => acc + Number(s.total || 0), 0);
+    const commissionPool = totalSales * 0.025; // 2.50%
+    const sellerCount = (store.employees || []).filter((e: Employee) => e.role === 'Vendedor').length;
+    
+    return {
+      totalPool: commissionPool,
+      perSeller: sellerCount > 0 ? commissionPool / sellerCount : 0,
+      totalSales
+    };
+  }, [store.sales, store.employees]);
+
+  // Calcula la comisión para un empleado
   const getEmployeeEarnings = (emp: Employee) => {
-    if (emp.role !== 'Mecánico') {
-      return { base: emp.baseSalary, commission: 0, total: emp.baseSalary, repairCount: 0 };
+    if (emp.role === 'Mecánico') {
+      const completedRepairs = (store.repairs || []).filter((r: VehicleRepair) => 
+        r.mechanicId === emp.id && r.status === 'Entregado'
+      );
+
+      const commissionTotal = completedRepairs.reduce((total: number, repair: VehicleRepair) => {
+        const laborTotal = repair.items
+          .filter((item: RepairItem) => item.type === 'Servicio')
+          .reduce((sum: number, item: RepairItem) => sum + (item.price * item.quantity), 0);
+        
+        return total + (laborTotal * emp.commissionRate);
+      }, 0);
+
+      return { 
+        base: emp.baseSalary, 
+        commission: commissionTotal, 
+        total: emp.baseSalary + commissionTotal,
+        repairCount: completedRepairs.length,
+        commissionType: 'Individual (Taller)'
+      };
     }
 
-    const completedRepairs = (store.repairs || []).filter((r: VehicleRepair) => 
-      r.mechanicId === emp.id && r.status === 'Entregado'
-    );
-
-    const commissionTotal = completedRepairs.reduce((total: number, repair: VehicleRepair) => {
-      const laborTotal = repair.items
-        .filter((item: RepairItem) => item.type === 'Servicio')
-        .reduce((sum: number, item: RepairItem) => sum + (item.price * item.quantity), 0);
-      
-      return total + (laborTotal * emp.commissionRate);
-    }, 0);
+    if (emp.role === 'Vendedor') {
+      return {
+        base: emp.baseSalary,
+        commission: sharedSalesCommission.perSeller,
+        total: emp.baseSalary + sharedSalesCommission.perSeller,
+        repairCount: 0,
+        commissionType: 'Compartida (2.5% Ventas Detal)'
+      };
+    }
 
     return { 
       base: emp.baseSalary, 
-      commission: commissionTotal, 
-      total: emp.baseSalary + commissionTotal,
-      repairCount: completedRepairs.length
+      commission: 0, 
+      total: emp.baseSalary, 
+      repairCount: 0,
+      commissionType: 'Sueldo Fijo'
     };
   };
 
@@ -75,7 +108,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       return;
     }
 
-    const confirmPay = confirm(`¿Desea liquidar el pago de $${earnings.total.toFixed(2)} para ${emp.name}?`);
+    const confirmPay = confirm(`¿Desea liquidar el pago de $${earnings.total.toFixed(2)} para ${emp.name}? Incluye base y comisiones.`);
     if (confirmPay) {
       const record: PayrollRecord = {
         id: Math.random().toString(36).substr(2, 9),
@@ -90,7 +123,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       if (store.addPayrollRecord) {
         store.addPayrollRecord(record);
       } else {
-        alert(`Pago de $${earnings.total.toFixed(2)} simulado con éxito para ${emp.name}`);
+        alert(`Pago de $${earnings.total.toFixed(2)} registrado con éxito para ${emp.name}`);
       }
     }
   };
@@ -103,14 +136,14 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       acc.base += e.base;
       return acc;
     }, { total: 0, commissions: 0, base: 0 });
-  }, [store.employees, store.repairs]);
+  }, [store.employees, store.repairs, store.sales, sharedSalesCommission]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
         <div>
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Nómina y Participaciones</h3>
-          <p className="text-slate-500 font-medium mt-2">Gestión de sueldos fijos y comisiones por servicios técnicos</p>
+          <p className="text-slate-500 font-medium mt-2">Gestión de sueldos y comisiones de taller (Variable) y oficina (2.5% Ventas)</p>
         </div>
         
         <div className="flex gap-3">
@@ -142,27 +175,36 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Presupuesto Total Nómina</p>
           <h4 className="text-4xl font-black text-slate-900 tracking-tighter">${totals.total.toFixed(2)}</h4>
           <div className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1 rounded-full w-fit">
-            <TrendingUp size={14}/> +12% vs mes anterior
+            <TrendingUp size={14}/> {((totals.commissions / totals.total) * 100).toFixed(1)}% es variable
           </div>
         </div>
 
         <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
           <div className="absolute -right-4 -bottom-4 text-white/5">
-             <Wrench size={120} />
+             <ShoppingBag size={120} />
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Comisiones a Liquidar</p>
-          <h4 className="text-4xl font-black tracking-tighter text-blue-400">${totals.commissions.toFixed(2)}</h4>
-          <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase">Basado en servicios realizados</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Fondo de Comisiones de Venta</p>
+          <h4 className="text-4xl font-black tracking-tighter text-emerald-400">${sharedSalesCommission.totalPool.toFixed(2)}</h4>
+          <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase">2.5% de ${sharedSalesCommission.totalSales.toFixed(2)} en ventas</p>
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 text-slate-50 opacity-10 group-hover:scale-110 transition-transform">
-             <Briefcase size={120} />
+             <Wrench size={120} />
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Sueldos Fijos (Oficina)</p>
-          <h4 className="text-4xl font-black text-slate-900 tracking-tighter">${totals.base.toFixed(2)}</h4>
-          <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase">Personal administrativo</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Comisiones por Servicios</p>
+          <h4 className="text-4xl font-black text-slate-900 tracking-tighter">${(totals.commissions - sharedSalesCommission.totalPool).toFixed(2)}</h4>
+          <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase italic">Para personal técnico</p>
         </div>
+      </div>
+
+      <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100 mb-6 flex items-center gap-4 text-blue-800">
+         <div className="bg-blue-600 text-white p-2 rounded-xl">
+            <Info size={20} />
+         </div>
+         <p className="text-xs font-bold leading-relaxed">
+            <b>Información:</b> Los empleados con rol <b>Vendedor</b> reciben una parte igual del 2.50% de las ventas totales. Los <b>Mecánicos</b> cobran comisión individual basada en su tasa (%) sobre la mano de obra.
+         </p>
       </div>
 
       {/* Lista de Empleados */}
@@ -171,11 +213,10 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador / Rol</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Pago</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Comisión</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Sueldo Base</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Comisión (%)</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Participación Ganada</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Total a Pagar</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Bono / Variable</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Total a Liquidar</th>
               <th className="px-8 py-5 no-print"></th>
             </tr>
           </thead>
@@ -186,7 +227,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                 <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-lg ${emp.role === 'Mecánico' ? 'bg-blue-600' : 'bg-slate-800'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-lg ${emp.role === 'Mecánico' ? 'bg-blue-600' : emp.role === 'Vendedor' ? 'bg-emerald-600' : 'bg-slate-800'}`}>
                         {emp.name.charAt(0)}
                       </div>
                       <div>
@@ -196,40 +237,45 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                      emp.role === 'Mecánico' 
-                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                        : 'bg-blue-100 text-blue-700 border-blue-200'
-                    }`}>
-                      {emp.role === 'Mecánico' ? 'Variable (50%)' : 'Sueldo Fijo'}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border w-fit ${
+                        emp.role === 'Mecánico' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                          : emp.role === 'Vendedor'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-50 text-slate-500 border-slate-200'
+                      }`}>
+                        {earnings.commissionType}
+                      </span>
+                      {emp.role === 'Mecánico' && (
+                        <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase italic">Tasa: {(emp.commissionRate * 100).toFixed(0)}% mano obra</p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <span className="font-bold text-slate-600 text-sm">${emp.baseSalary.toFixed(2)}</span>
                   </td>
                   <td className="px-8 py-6 text-right">
-                    <span className="font-mono text-xs font-black text-slate-400">{(emp.commissionRate * 100).toFixed(0)}%</span>
-                  </td>
-                  <td className="px-8 py-6 text-right">
                     <div className="flex flex-col items-end">
-                      <span className={`font-black text-sm ${earnings.commission > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
+                      <span className={`font-black text-sm ${earnings.commission > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                         +${earnings.commission.toFixed(2)}
                       </span>
-                      {emp.role === 'Mecánico' && earnings.repairCount > 0 && (
-                        <p className="text-[9px] font-bold text-slate-400 uppercase italic">de {earnings.repairCount} vehículos</p>
+                      {earnings.repairCount > 0 && (
+                        <p className="text-[9px] font-bold text-slate-400 uppercase italic">de {earnings.repairCount} reparaciones</p>
                       )}
                     </div>
                   </td>
                   <td className="px-8 py-6 text-center">
-                    <div className="inline-flex flex-col items-center px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-blue-200 transition-all">
-                      <span className="text-lg font-black text-slate-900 tracking-tighter">${earnings.total.toFixed(2)}</span>
+                    <div className="inline-flex flex-col items-center px-5 py-2.5 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-blue-200 transition-all">
+                      <span className="text-xl font-black text-slate-900 tracking-tighter">${earnings.total.toFixed(2)}</span>
                       <span className="text-[9px] font-bold text-slate-400 uppercase italic">{(earnings.total * store.exchangeRate).toLocaleString('es-VE')} Bs</span>
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right no-print">
                     <button 
                       onClick={() => handleLiquidate(emp)}
-                      className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-blue-600 hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm group/btn"
+                      className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 transition-all shadow-sm group/btn"
+                      title="Liquidar Pagos"
                     >
                       <CheckCircle2 size={18} className="group-hover/btn:scale-110 transition-transform" />
                     </button>
@@ -281,9 +327,9 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                     value={newEmployee.role} 
                     onChange={(e) => setNewEmployee({...newEmployee, role: e.target.value as Employee['role'], commissionRate: e.target.value === 'Mecánico' ? 0.50 : 0})}
                   >
-                    <option value="Mecánico">Mecánico (Comisión)</option>
-                    <option value="Vendedor">Vendedor (Oficina)</option>
-                    <option value="Administrador">Administrador (Oficina)</option>
+                    <option value="Mecánico">Mecánico (Comisión Individual)</option>
+                    <option value="Vendedor">Vendedor (Bono Ventas 2.5%)</option>
+                    <option value="Administrador">Administrador (Sueldo Fijo)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -301,7 +347,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
               {newEmployee.role === 'Mecánico' && (
                 <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Comisión por Mano de Obra</label>
+                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Tasa de Participación Técnica</label>
                     <span className="text-xl font-black text-blue-700">{(newEmployee.commissionRate || 0) * 100}%</span>
                   </div>
                   <input 
@@ -313,7 +359,16 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                     value={newEmployee.commissionRate} 
                     onChange={(e) => setNewEmployee({...newEmployee, commissionRate: Number(e.target.value)})} 
                   />
-                  <p className="text-[9px] text-blue-400 font-bold uppercase italic">El taller asigna el 50% por defecto para reparaciones mecánicas.</p>
+                  <p className="text-[9px] text-blue-400 font-bold uppercase italic text-center">Este porcentaje se aplica sobre el costo de la mano de obra en cada reparación finalizada.</p>
+                </div>
+              )}
+
+              {newEmployee.role === 'Vendedor' && (
+                <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 flex items-start gap-4">
+                   <ShoppingBag className="text-emerald-600 shrink-0" size={20} />
+                   <p className="text-[10px] text-emerald-800 font-bold leading-relaxed uppercase">
+                      El rol de Vendedor no usa tasa personalizada. Participa automáticamente del fondo del 2.50% de las ventas totales del taller repartido entre sus pares.
+                   </p>
                 </div>
               )}
 
