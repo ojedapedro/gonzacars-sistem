@@ -283,6 +283,11 @@ export const useGonzacarsStore = () => {
     syncRow('Employees', 'update', emp);
   };
 
+  const deleteEmployee = (id: string) => {
+    setEmployees(prev => prev.filter(e => e.id !== id));
+    syncRow('Employees', 'delete', { id });
+  };
+
   const addPayrollRecord = (record: PayrollRecord) => {
     setPayroll(prev => [...prev, record]);
     syncRow('Payroll', 'add', record);
@@ -327,7 +332,7 @@ export const useGonzacarsStore = () => {
     sales, setSales, addSale,
     purchases, setPurchases, addPurchase,
     expenses, setExpenses, addExpense,
-    employees, setEmployees, addEmployee, updateEmployee,
+    employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
     payroll, setPayroll, addPayrollRecord
   };
 };

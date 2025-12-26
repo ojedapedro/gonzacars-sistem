@@ -1,5 +1,4 @@
 
-// Add missing React and hooks imports
 import React, { useState, useMemo } from 'react';
 import { 
   Users, 
@@ -7,27 +6,28 @@ import {
   DollarSign, 
   TrendingUp, 
   Wrench, 
-  Briefcase, 
-  ChevronRight, 
   Search, 
   CheckCircle2, 
-  Clock, 
-  ArrowUpRight,
-  FileText,
-  AlertCircle,
-  ShoppingBag,
-  Info
+  ShoppingBag, 
+  Info,
+  Edit3,
+  Trash2,
+  X,
+  Check
 } from 'lucide-react';
 import { Employee, VehicleRepair, RepairItem, PayrollRecord, Sale } from '../types';
 
 const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({
+  const [formData, setFormData] = useState<Partial<Employee>>({
     role: 'Mecánico',
     baseSalary: 0,
-    commissionRate: 0.50 // 50% por defecto para mecánicos
+    commissionRate: 0.50 
   });
+
+  const isAdm = store.currentUser?.role === 'administrador';
 
   const filteredEmployees = useMemo(() => {
     return (store.employees || []).filter((e: Employee) => 
@@ -38,7 +38,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
   // Cálculo de comisiones compartidas para vendedores (2.5% de ventas totales)
   const sharedSalesCommission = useMemo(() => {
     const totalSales = (store.sales || []).reduce((acc: number, s: Sale) => acc + Number(s.total || 0), 0);
-    const commissionPool = totalSales * 0.025; // 2.50%
+    const commissionPool = totalSales * 0.025; 
     const sellerCount = (store.employees || []).filter((e: Employee) => e.role === 'Vendedor').length;
     
     return {
@@ -48,7 +48,6 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
     };
   }, [store.sales, store.employees]);
 
-  // Calcula la comisión para un empleado
   const getEmployeeEarnings = (emp: Employee) => {
     if (emp.role === 'Mecánico') {
       const completedRepairs = (store.repairs || []).filter((r: VehicleRepair) => 
@@ -91,14 +90,39 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
     };
   };
 
-  const handleAddEmployee = (e: React.FormEvent) => {
+  const handleOpenAdd = () => {
+    setEditingEmployee(null);
+    setFormData({ role: 'Mecánico', baseSalary: 0, commissionRate: 0.50 });
+    setShowAddModal(true);
+  };
+
+  const handleOpenEdit = (emp: Employee) => {
+    setEditingEmployee(emp);
+    setFormData({ ...emp });
+    setShowAddModal(true);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (!confirm(`¿Está seguro de eliminar a ${name} de la nómina? Esta acción no se puede deshacer.`)) return;
+    store.deleteEmployee(id);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    store.addEmployee({
-      ...newEmployee as Employee,
-      id: Math.random().toString(36).substr(2, 9)
-    });
+    if (editingEmployee) {
+      store.updateEmployee({
+        ...editingEmployee,
+        ...formData
+      } as Employee);
+      alert('Información del colaborador actualizada');
+    } else {
+      store.addEmployee({
+        ...formData as Employee,
+        id: Math.random().toString(36).substr(2, 9)
+      });
+      alert('Nuevo colaborador registrado');
+    }
     setShowAddModal(false);
-    setNewEmployee({ role: 'Mecánico', baseSalary: 0, commissionRate: 0.50 });
   };
 
   const handleLiquidate = (emp: Employee) => {
@@ -143,7 +167,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
         <div>
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Nómina y Participaciones</h3>
-          <p className="text-slate-500 font-medium mt-2">Gestión de sueldos y comisiones de taller (Variable) y oficina (2.5% Ventas)</p>
+          <p className="text-slate-500 font-medium mt-2">Gestión de sueldos y comisiones de taller y oficina</p>
         </div>
         
         <div className="flex gap-3">
@@ -152,17 +176,19 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
             <input 
               type="text" 
               placeholder="Buscar personal..." 
-              className="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-bold text-sm transition-all"
+              className="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-bold text-sm transition-all shadow-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all flex items-center gap-2"
-          >
-            <UserPlus size={18}/> Alta de Personal
-          </button>
+          {isAdm && (
+            <button 
+              onClick={handleOpenAdd}
+              className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all flex items-center gap-2 active:scale-95"
+            >
+              <UserPlus size={18}/> Alta de Personal
+            </button>
+          )}
         </div>
       </div>
 
@@ -175,7 +201,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Presupuesto Total Nómina</p>
           <h4 className="text-4xl font-black text-slate-900 tracking-tighter">${totals.total.toFixed(2)}</h4>
           <div className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1 rounded-full w-fit">
-            <TrendingUp size={14}/> {((totals.commissions / totals.total) * 100).toFixed(1)}% es variable
+            <TrendingUp size={14}/> {totals.total > 0 ? ((totals.commissions / totals.total) * 100).toFixed(1) : 0}% es variable
           </div>
         </div>
 
@@ -199,92 +225,113 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
       </div>
 
       <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100 mb-6 flex items-center gap-4 text-blue-800">
-         <div className="bg-blue-600 text-white p-2 rounded-xl">
+         <div className="bg-blue-600 text-white p-2 rounded-xl shadow-lg">
             <Info size={20} />
          </div>
          <p className="text-xs font-bold leading-relaxed">
-            <b>Información:</b> Los empleados con rol <b>Vendedor</b> reciben una parte igual del 2.50% de las ventas totales. Los <b>Mecánicos</b> cobran comisión individual basada en su tasa (%) sobre la mano de obra.
+            <b>Suministro Informativo:</b> Los Vendedores perciben el 2.50% de las ventas. Mecánicos cobran comisión sobre mano de obra.
          </p>
       </div>
 
       {/* Lista de Empleados */}
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador / Rol</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Comisión</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Sueldo Base</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Bono / Variable</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Total a Liquidar</th>
-              <th className="px-8 py-5 no-print"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filteredEmployees.map((emp: Employee) => {
-              const earnings = getEmployeeEarnings(emp);
-              return (
-                <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-lg ${emp.role === 'Mecánico' ? 'bg-blue-600' : emp.role === 'Vendedor' ? 'bg-emerald-600' : 'bg-slate-800'}`}>
-                        {emp.name.charAt(0)}
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador / Rol</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Esquema de Pago</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Base</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Comisión</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Total</th>
+                <th className="px-8 py-5 no-print text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredEmployees.map((emp: Employee) => {
+                const earnings = getEmployeeEarnings(emp);
+                return (
+                  <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-lg ${emp.role === 'Mecánico' ? 'bg-blue-600' : emp.role === 'Vendedor' ? 'bg-emerald-600' : 'bg-slate-800'}`}>
+                          {emp.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-800 uppercase text-sm leading-tight">{emp.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 tracking-tighter">{emp.role}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-black text-slate-800 uppercase text-sm leading-tight">{emp.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 tracking-tighter">{emp.role}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border w-fit ${
+                          emp.role === 'Mecánico' 
+                            ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                            : emp.role === 'Vendedor'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-50 text-slate-500 border-slate-200'
+                        }`}>
+                          {earnings.commissionType}
+                        </span>
+                        {emp.role === 'Mecánico' && (
+                          <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase italic">Tasa: {(emp.commissionRate * 100).toFixed(0)}% mano obra</p>
+                        )}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-col">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border w-fit ${
-                        emp.role === 'Mecánico' 
-                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                          : emp.role === 'Vendedor'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-slate-50 text-slate-500 border-slate-200'
-                      }`}>
-                        {earnings.commissionType}
-                      </span>
-                      {emp.role === 'Mecánico' && (
-                        <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase italic">Tasa: {(emp.commissionRate * 100).toFixed(0)}% mano obra</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <span className="font-bold text-slate-600 text-sm">${emp.baseSalary.toFixed(2)}</span>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className={`font-black text-sm ${earnings.commission > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
-                        +${earnings.commission.toFixed(2)}
-                      </span>
-                      {earnings.repairCount > 0 && (
-                        <p className="text-[9px] font-bold text-slate-400 uppercase italic">de {earnings.repairCount} reparaciones</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 text-center">
-                    <div className="inline-flex flex-col items-center px-5 py-2.5 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-blue-200 transition-all">
-                      <span className="text-xl font-black text-slate-900 tracking-tighter">${earnings.total.toFixed(2)}</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase italic">{(earnings.total * store.exchangeRate).toLocaleString('es-VE')} Bs</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 text-right no-print">
-                    <button 
-                      onClick={() => handleLiquidate(emp)}
-                      className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 transition-all shadow-sm group/btn"
-                      title="Liquidar Pagos"
-                    >
-                      <CheckCircle2 size={18} className="group-hover/btn:scale-110 transition-transform" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <span className="font-bold text-slate-600 text-sm">${emp.baseSalary.toFixed(2)}</span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className={`font-black text-sm ${earnings.commission > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                          +${earnings.commission.toFixed(2)}
+                        </span>
+                        {earnings.repairCount > 0 && (
+                          <p className="text-[9px] font-bold text-slate-400 uppercase italic">de {earnings.repairCount} serv.</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-center">
+                      <div className="inline-flex flex-col items-center px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-blue-200 transition-all">
+                        <span className="text-lg font-black text-slate-900 tracking-tighter">${earnings.total.toFixed(2)}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-center no-print">
+                      <div className="flex justify-center gap-2">
+                        <button 
+                          onClick={() => handleLiquidate(emp)}
+                          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 transition-all shadow-sm"
+                          title="Liquidar Pagos"
+                        >
+                          <CheckCircle2 size={16} />
+                        </button>
+                        {isAdm && (
+                          <>
+                            <button 
+                              onClick={() => handleOpenEdit(emp)}
+                              className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-blue-600 hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm"
+                              title="Editar Empleado"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(emp.id, emp.name)}
+                              className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-red-600 hover:border-red-500 hover:bg-red-50 transition-all shadow-sm"
+                              title="Eliminar Empleado"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         
         {filteredEmployees.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-24 text-slate-300">
@@ -294,7 +341,7 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
         )}
       </div>
 
-      {/* Modal Agregar Personal */}
+      {/* Modal Agregar/Editar Personal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in duration-300">
@@ -302,11 +349,15 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
               <div className="absolute top-0 right-0 p-10 opacity-10">
                 <Users size={120} />
               </div>
-              <h3 className="text-3xl font-black uppercase tracking-tighter relative z-10">Contratación Personal</h3>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1 relative z-10">Definición de esquema de pago</p>
+              <h3 className="text-3xl font-black uppercase tracking-tighter relative z-10">
+                {editingEmployee ? 'Modificar Colaborador' : 'Contratación Personal'}
+              </h3>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1 relative z-10">
+                {editingEmployee ? `Editando registro de ${editingEmployee.name}` : 'Definición de esquema de pago'}
+              </p>
             </div>
             
-            <form onSubmit={handleAddEmployee} className="p-10 space-y-6">
+            <form onSubmit={handleSubmit} className="p-10 space-y-6">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Completo del Colaborador</label>
                 <input 
@@ -314,8 +365,8 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                   type="text" 
                   placeholder="Ej: Pedro Arrieche" 
                   className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-bold transition-all" 
-                  value={newEmployee.name || ''} 
-                  onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})} 
+                  value={formData.name || ''} 
+                  onChange={(e) => setFormData({...formData, name: e.target.value})} 
                 />
               </div>
 
@@ -324,12 +375,12 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rol / Cargo</label>
                   <select 
                     className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest outline-none focus:ring-4 focus:ring-blue-50 transition-all appearance-none cursor-pointer" 
-                    value={newEmployee.role} 
-                    onChange={(e) => setNewEmployee({...newEmployee, role: e.target.value as Employee['role'], commissionRate: e.target.value === 'Mecánico' ? 0.50 : 0})}
+                    value={formData.role} 
+                    onChange={(e) => setFormData({...formData, role: e.target.value as Employee['role'], commissionRate: e.target.value === 'Mecánico' ? 0.50 : 0})}
                   >
-                    <option value="Mecánico">Mecánico (Comisión Individual)</option>
-                    <option value="Vendedor">Vendedor (Bono Ventas 2.5%)</option>
-                    <option value="Administrador">Administrador (Sueldo Fijo)</option>
+                    <option value="Mecánico">Mecánico</option>
+                    <option value="Vendedor">Vendedor</option>
+                    <option value="Administrador">Administrador</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -338,44 +389,52 @@ const PayrollModule: React.FC<{ store: any }> = ({ store }) => {
                     required 
                     type="number" 
                     className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-lg outline-none focus:ring-4 focus:ring-blue-50 font-bold transition-all" 
-                    value={newEmployee.baseSalary || ''} 
-                    onChange={(e) => setNewEmployee({...newEmployee, baseSalary: Number(e.target.value)})} 
+                    value={formData.baseSalary || ''} 
+                    onChange={(e) => setFormData({...formData, baseSalary: Number(e.target.value)})} 
                   />
                 </div>
               </div>
 
-              {newEmployee.role === 'Mecánico' && (
+              {formData.role === 'Mecánico' && (
                 <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Tasa de Participación Técnica</label>
-                    <span className="text-xl font-black text-blue-700">{(newEmployee.commissionRate || 0) * 100}%</span>
+                    <span className="text-xl font-black text-blue-700">{(formData.commissionRate || 0) * 100}%</span>
                   </div>
                   <input 
                     type="range" 
                     min="0" 
                     max="1" 
                     step="0.01" 
-                    className="w-full accent-blue-600"
-                    value={newEmployee.commissionRate} 
-                    onChange={(e) => setNewEmployee({...newEmployee, commissionRate: Number(e.target.value)})} 
+                    className="w-full accent-blue-600 cursor-pointer"
+                    value={formData.commissionRate} 
+                    onChange={(e) => setFormData({...formData, commissionRate: Number(e.target.value)})} 
                   />
-                  <p className="text-[9px] text-blue-400 font-bold uppercase italic text-center">Este porcentaje se aplica sobre el costo de la mano de obra en cada reparación finalizada.</p>
                 </div>
               )}
 
-              {newEmployee.role === 'Vendedor' && (
+              {formData.role === 'Vendedor' && (
                 <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 flex items-start gap-4">
                    <ShoppingBag className="text-emerald-600 shrink-0" size={20} />
                    <p className="text-[10px] text-emerald-800 font-bold leading-relaxed uppercase">
-                      El rol de Vendedor no usa tasa personalizada. Participa automáticamente del fondo del 2.50% de las ventas totales del taller repartido entre sus pares.
+                      Participa automáticamente del fondo del 2.50% de las ventas totales.
                    </p>
                 </div>
               )}
 
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors">Cancelar</button>
-                <button type="submit" className="flex-[1.5] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-black shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2">
-                  Confirmar Registro
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)} 
+                  className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors"
+                >
+                  <X size={16} className="inline mr-1" /> Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-[1.5] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-black shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <Check size={16} /> {editingEmployee ? 'Guardar Cambios' : 'Confirmar Registro'}
                 </button>
               </div>
             </form>
