@@ -18,7 +18,8 @@ import {
   Fuel,
   Ticket,
   CalendarDays,
-  ArrowDownCircle
+  ArrowDownCircle,
+  Receipt
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -36,6 +37,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [tempPaymentMethod, setTempPaymentMethod] = useState<PaymentMethod>('Efectivo $');
   const [abonoAmount, setAbonoAmount] = useState<number>(0);
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
+  const [lastInstallment, setLastInstallment] = useState<Installment | null>(null);
+  const [showAbonoReceipt, setShowAbonoReceipt] = useState(false);
 
   const filteredInventory = useMemo(() => {
     return (store.inventory || []).filter((p: Product) => 
@@ -148,9 +151,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     };
     setCurrentRepair(updated);
     store.updateRepair(updated);
+    setLastInstallment(newInstallment);
     setShowAbonoModal(false);
+    setShowAbonoReceipt(true);
     setAbonoAmount(0);
-    alert('Abono registrado con éxito');
   };
 
   const finalizeRepair = () => {
@@ -175,12 +179,11 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       installments: updatedInstallments
     };
 
-    // Sincronizar cambios en el store
     store.updateRepair(updated);
     
-    // Registrar la venta en la tienda si hay repuestos
+    // Registrar la venta en la tienda
     store.addSale({
-      id: `FAC-${Date.now().toString().slice(-6)}`,
+      id: `REP-${Date.now().toString().slice(-6)}`,
       customerId: currentRepair.customerId,
       date: new Date().toISOString().split('T')[0],
       customerName: currentRepair.ownerName,
@@ -197,25 +200,15 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       paymentMethod: tempPaymentMethod
     });
 
-    alert('Servicio finalizado con éxito. El vehículo ha sido entregado.');
-    
-    // Imprimir antes de resetear
+    // Acción de imprimir el reporte final
     setTimeout(() => {
       window.print();
       // Limpiar y liberar la vista para el siguiente vehículo
       setCurrentRepair(null);
       setSearchPlate('');
       setShowPayModal(false);
+      alert('Orden finalizada, entregada y pantalla liberada.');
     }, 500);
-  };
-
-  const getStatusStyles = (status: ServiceStatus) => {
-    switch (status) {
-      case 'Entregado': return 'bg-emerald-600 text-white border-emerald-700';
-      case 'Finalizado': return 'bg-blue-600 text-white border-blue-700';
-      case 'En Reparación': return 'bg-amber-600 text-white border-amber-700';
-      default: return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
   };
 
   const getItemTypeStyles = (type: RepairItem['type']) => {
@@ -227,13 +220,22 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     }
   };
 
+  const getStatusStyles = (status: ServiceStatus) => {
+    switch (status) {
+      case 'Entregado': return 'bg-emerald-600 text-white border-emerald-700';
+      case 'Finalizado': return 'bg-blue-600 text-white border-blue-700';
+      case 'En Reparación': return 'bg-amber-600 text-white border-amber-700';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       
-      {/* SECCIÓN DE IMPRESIÓN DE INFORME (BASADO EN LA ÚLTIMA CAPTURA) */}
+      {/* SECCIÓN DE IMPRESIÓN DE INFORME (ESTILO PDF ÚLTIMA REFERENCIA) */}
       {currentRepair && (
         <div className="hidden print:block print-only p-12 bg-white text-slate-950 font-sans min-h-screen">
-          {/* Header Superior Lateral */}
+          {/* Header Superior Minimalista */}
           <div className="flex justify-between items-start mb-14">
             <div className="flex gap-10 items-center">
               <img src={LOGO_URL} alt="Logo" className="w-24 h-24 object-contain grayscale" />
@@ -270,17 +272,20 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
           </div>
 
-          {/* Diagnóstico */}
+          {/* Diagnóstico con barra de acento */}
           <div className="mb-14">
              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                  <ClipboardList size={16} />
+                </div>
                 <h4 className="font-black text-slate-900 uppercase text-xs tracking-widest">DIAGNÓSTICO Y REQUERIMIENTO</h4>
              </div>
              <div className="p-10 border-l-[6px] border-slate-900 bg-slate-50/50 text-xl italic text-slate-700 leading-relaxed font-semibold">
-                {currentRepair.diagnosis || "No se especificaron observaciones adicionales."}
+                {currentRepair.diagnosis || "Sin diagnóstico adicional registrado."}
              </div>
           </div>
 
-          {/* Tabla Maestra con Cantidades, Precios y Totales */}
+          {/* Tabla Desglosada: Repuestos, Consumibles, Mano de Obra y Abonos */}
           <div className="mb-14">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -293,9 +298,9 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {/* Cargos de Repuestos / Servicios */}
+                {/* Ítems de la Reparación */}
                 {currentRepair.items.map((item, idx) => (
-                  <tr key={idx} className="group">
+                  <tr key={idx}>
                     <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
                     <td className="py-8 px-4">
                       <p className="font-black text-slate-900 uppercase text-sm leading-tight mb-1">{item.description}</p>
@@ -307,7 +312,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </tr>
                 ))}
                 
-                {/* Relación de Abonos */}
+                {/* Abonos Realizados */}
                 {currentRepair.installments?.map((inst, idx) => (
                   <tr key={`inst-${idx}`} className="bg-slate-50/20">
                     <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(inst.date).toLocaleDateString()}</td>
@@ -323,7 +328,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </table>
           </div>
 
-          {/* Caja de Total Balance Final */}
+          {/* Caja de Total Final Refinada */}
           <div className="flex justify-end mb-24">
              <div className="w-[420px] border-[4px] border-slate-950 p-10 text-right relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-slate-950 rotate-45 translate-x-12 -translate-y-12"></div>
@@ -337,7 +342,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
              </div>
           </div>
 
-          {/* Firmas en la base */}
+          {/* Firmas de Autoridad */}
           <div className="grid grid-cols-2 gap-32 px-10 text-center font-black uppercase text-[10px] tracking-[0.3em] mt-auto">
             <div className="border-t-[2px] border-slate-950 pt-6">
               FIRMA AUTORIZADA
@@ -349,14 +354,48 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
           <div className="mt-32 pt-10 border-t border-slate-100 flex justify-between items-center opacity-40">
              <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest">https://gonzacars-sistem.vercel.app</div>
-             <div className="text-[9px] font-black uppercase text-slate-500">Página 1 / 1</div>
+             <div className="text-[9px] font-black uppercase text-slate-500">Documento Generado el {new Date().toLocaleDateString()}</div>
           </div>
         </div>
       )}
 
-      {/* UI DE LA APLICACIÓN (PARA USO EN PANTALLA) */}
+      {/* COMPROBANTE DE ABONO (PRINT ONLY) */}
+      {lastInstallment && currentRepair && (
+        <div className="hidden print:block print-only bg-white text-slate-900 w-full p-8" style={{ maxWidth: '80mm' }}>
+           <div className="text-center mb-6">
+            <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain grayscale" />
+            <h2 className="text-lg font-black uppercase tracking-tighter">Gonzacars C.A.</h2>
+            <p className="text-[10px] font-black tracking-widest">RECIBO DE ABONO</p>
+          </div>
+          <div className="border-y border-dashed border-slate-900 py-3 mb-4 text-[10px]">
+             <p><b>Fecha:</b> {new Date(lastInstallment.date).toLocaleString()}</p>
+             <p><b>Orden:</b> #{currentRepair.id.toUpperCase().slice(-8)}</p>
+             <p><b>Cliente:</b> {currentRepair.ownerName}</p>
+             <p><b>Vehículo:</b> {currentRepair.brand} {currentRepair.model}</p>
+          </div>
+          <div className="space-y-2 mb-6">
+             <div className="flex justify-between font-black text-sm">
+                <span>MONTO ABONADO:</span>
+                <span>${lastInstallment.amount.toFixed(2)}</span>
+             </div>
+             <div className="flex justify-between text-[10px]">
+                <span>Método:</span>
+                <span className="uppercase">{lastInstallment.method}</span>
+             </div>
+             <div className="flex justify-between text-[10px] pt-2 border-t border-slate-100">
+                <span>SALDO RESTANTE:</span>
+                <span className="font-black">${calculateBalance().toFixed(2)}</span>
+             </div>
+          </div>
+          <div className="text-center text-[9px] font-bold uppercase border-t border-dashed border-slate-900 pt-4">
+             ¡Gracias por su pago!
+          </div>
+        </div>
+      )}
+
+      {/* UI DE LA APLICACIÓN (NO-PRINT) */}
       <div className="print:hidden h-full flex flex-col">
-        {/* Buscador de Órdenes con diseño refinado */}
+        {/* Buscador de Órdenes */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 flex gap-4 no-print animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="relative flex-1">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={24}/>
@@ -376,7 +415,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
         {currentRepair ? (
           <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col animate-in fade-in zoom-in-95 duration-500 relative">
-            {/* Header del Panel del Vehículo */}
+            {/* Header de la App */}
             <div className="p-10 bg-slate-950 text-white flex justify-between items-start relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
                 <Wrench size={240} />
@@ -427,7 +466,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
             </div>
 
-            {/* Contenido Detallado */}
             <div className="p-10 space-y-12 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/20">
               <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 relative shadow-sm">
                 <div className="absolute -top-5 left-12 bg-blue-600 text-white px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl">
@@ -455,7 +493,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </div>
                 </div>
 
-                {/* Tabla de Cargos en App */}
                 <div className="overflow-hidden border-4 border-slate-950 rounded-[3.5rem] shadow-2xl bg-white">
                   <table className="w-full border-collapse">
                     <thead>
@@ -543,62 +580,40 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         )}
       </div>
 
-      {/* MODALES REFINADOS */}
-      {showInventorySearch && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[4rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border-8 border-slate-100">
-            <div className="p-12 border-b-4 border-slate-50 bg-slate-50/50">
-              <div className="flex justify-between items-center mb-10">
-                <div>
-                  <h3 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none">Repuestos Disponibles</h3>
-                  <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.4em] mt-4 flex items-center gap-3">
-                    <Package size={18} /> Inventario en tiempo real
-                  </p>
-                </div>
-                <button onClick={() => setShowInventorySearch(false)} className="w-16 h-16 bg-white border-4 border-slate-100 rounded-3xl text-slate-300 hover:text-red-500 transition-all flex items-center justify-center">
-                  <X size={32} />
-                </button>
+      {/* MODAL: RECIBO DE ABONO PROCESADO */}
+      {showAbonoReceipt && lastInstallment && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[200] p-4 no-print">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-500">
+            <div className="bg-emerald-600 p-10 text-white text-center">
+              <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                <Receipt size={32} />
               </div>
-              <div className="relative">
-                <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400" size={30}/>
-                <input 
-                  type="text" 
-                  placeholder="Buscar repuesto por nombre o código..." 
-                  className="w-full pl-20 pr-10 py-6 bg-white border-4 border-slate-200 rounded-[2.5rem] outline-none focus:ring-8 focus:ring-blue-50 font-black text-xl transition-all shadow-inner"
-                  value={invSearchTerm}
-                  onChange={(e) => setInvSearchTerm(e.target.value)}
-                  autoFocus
-                />
-              </div>
+              <h3 className="text-2xl font-black uppercase tracking-tighter">Abono Registrado</h3>
+              <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mt-2 opacity-80 italic">Comprobante de Recepción</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-12 space-y-5 bg-white custom-scrollbar">
-              {filteredInventory.map((p: Product) => (
-                <button 
-                  key={p.id}
-                  onClick={() => addFromInventory(p)}
-                  className="w-full p-8 flex items-center justify-between bg-slate-50 border-4 border-slate-100 rounded-[3rem] hover:border-blue-600 hover:bg-blue-50 transition-all text-left group shadow-sm active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-8">
-                    <div className="w-16 h-16 bg-slate-950 text-white rounded-3xl flex items-center justify-center font-black text-2xl group-hover:bg-blue-600 transition-colors shadow-lg">
-                      {p.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-black text-slate-900 group-hover:text-blue-700 uppercase text-2xl tracking-tighter leading-none mb-1">{p.name}</p>
-                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                         {p.category} <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span> STOCK: {p.quantity}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-4xl font-black text-blue-600 tracking-tighter leading-none mb-1">${Number(p.price).toFixed(2)}</p>
-                  </div>
-                </button>
-              ))}
+            <div className="p-10">
+              <div className="bg-slate-50 rounded-[2rem] p-6 border border-slate-200 space-y-4 mb-8">
+                 <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Pagado</span>
+                    <span className="text-3xl font-black text-slate-900 tracking-tighter">${lastInstallment.amount.toFixed(2)}</span>
+                 </div>
+                 <div className="flex justify-between items-center border-t border-slate-200 pt-4">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Restante</span>
+                    <span className="text-xl font-black text-blue-600 tracking-tight">${calculateBalance().toFixed(2)}</span>
+                 </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                 <button onClick={() => { window.print(); setShowAbonoReceipt(false); }} className="bg-slate-950 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all">
+                    <Printer size={18}/> Imprimir Comprobante
+                 </button>
+                 <button onClick={() => setShowAbonoReceipt(false)} className="py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600">Continuar</button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* MODAL: REGISTRAR ABONO */}
       {showAbonoModal && (
         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[5rem] shadow-2xl max-w-md w-full p-16 animate-in zoom-in duration-300 border-8 border-slate-100 text-center">
@@ -634,6 +649,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
+      {/* MODAL: ESTADO DE CUENTA (SOA) */}
       {showSOAModal && currentRepair && (
         <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-center justify-center z-[110] p-4 no-print overflow-y-auto">
           <div className="bg-white rounded-[4rem] shadow-2xl max-w-5xl w-full flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in duration-300 border-8 border-slate-100">
@@ -732,6 +748,63 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
+      {/* MODAL: BÚSQUEDA DE INVENTARIO */}
+      {showInventorySearch && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[4rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border-8 border-slate-100">
+            <div className="p-12 border-b-4 border-slate-50 bg-slate-50/50">
+              <div className="flex justify-between items-center mb-10">
+                <div>
+                  <h3 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none">Repuestos Disponibles</h3>
+                  <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.4em] mt-4 flex items-center gap-3">
+                    <Package size={18} /> Inventario en tiempo real
+                  </p>
+                </div>
+                <button onClick={() => setShowInventorySearch(false)} className="w-16 h-16 bg-white border-4 border-slate-100 rounded-3xl text-slate-300 hover:text-red-500 transition-all flex items-center justify-center">
+                  <X size={32} />
+                </button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400" size={30}/>
+                <input 
+                  type="text" 
+                  placeholder="Buscar repuesto por nombre o código..." 
+                  className="w-full pl-20 pr-10 py-6 bg-white border-4 border-slate-200 rounded-[2.5rem] outline-none focus:ring-8 focus:ring-blue-50 font-black text-xl transition-all shadow-inner"
+                  value={invSearchTerm}
+                  onChange={(e) => setInvSearchTerm(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-12 space-y-5 bg-white custom-scrollbar">
+              {filteredInventory.map((p: Product) => (
+                <button 
+                  key={p.id}
+                  onClick={() => addFromInventory(p)}
+                  className="w-full p-8 flex items-center justify-between bg-slate-50 border-4 border-slate-100 rounded-[3rem] hover:border-blue-600 hover:bg-blue-50 transition-all text-left group shadow-sm active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-8">
+                    <div className="w-16 h-16 bg-slate-950 text-white rounded-3xl flex items-center justify-center font-black text-2xl group-hover:bg-blue-600 transition-colors shadow-lg">
+                      {p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-900 group-hover:text-blue-700 uppercase text-2xl tracking-tighter leading-none mb-1">{p.name}</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                         {p.category} <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span> STOCK: {p.quantity}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-4xl font-black text-blue-600 tracking-tighter leading-none mb-1">${Number(p.price).toFixed(2)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: LIQUIDAR Y ENTREGAR */}
       {showPayModal && (
         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[5rem] shadow-2xl max-w-xl w-full p-16 text-center border-8 border-slate-100 animate-in zoom-in duration-300">
