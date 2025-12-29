@@ -12,18 +12,13 @@ import {
   ClipboardList, 
   DollarSign, 
   History, 
-  Wallet, 
-  CalendarDays,
   X,
   FileText,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Ticket,
-  ChevronRight,
-  ShieldCheck,
-  Info,
   Layers,
-  Fuel
+  Fuel,
+  Ticket,
+  CalendarDays,
+  ArrowDownCircle
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -35,8 +30,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showAbonoModal, setShowAbonoModal] = useState(false);
   const [showSOAModal, setShowSOAModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedInstallment, setSelectedInstallment] = useState<Installment | null>(null);
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [invSearchTerm, setInvSearchTerm] = useState('');
   
@@ -182,10 +175,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       installments: updatedInstallments
     };
 
+    // Sincronizar cambios en el store
     store.updateRepair(updated);
-    setCurrentRepair(updated);
-    setShowPayModal(false);
     
+    // Registrar la venta en la tienda si hay repuestos
     store.addSale({
       id: `FAC-${Date.now().toString().slice(-6)}`,
       customerId: currentRepair.customerId,
@@ -204,8 +197,16 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       paymentMethod: tempPaymentMethod
     });
 
-    alert('Servicio finalizado con éxito.');
-    setTimeout(() => window.print(), 500);
+    alert('Servicio finalizado con éxito. El vehículo ha sido entregado.');
+    
+    // Imprimir antes de resetear
+    setTimeout(() => {
+      window.print();
+      // Limpiar y liberar la vista para el siguiente vehículo
+      setCurrentRepair(null);
+      setSearchPlate('');
+      setShowPayModal(false);
+    }, 500);
   };
 
   const getStatusStyles = (status: ServiceStatus) => {
@@ -229,141 +230,139 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       
-      {/* SECCIÓN DE IMPRESIÓN DE INFORME (ESTILO PDF ADJUNTO) */}
+      {/* SECCIÓN DE IMPRESIÓN DE INFORME (BASADO EN LA ÚLTIMA CAPTURA) */}
       {currentRepair && (
-        <div className="hidden print:block print-only p-12 bg-white text-slate-900 font-sans min-h-screen">
-          {/* Header - Basado en Screenshot */}
-          <div className="flex justify-between items-start mb-10">
-            <div className="flex gap-8 items-center">
+        <div className="hidden print:block print-only p-12 bg-white text-slate-950 font-sans min-h-screen">
+          {/* Header Superior Lateral */}
+          <div className="flex justify-between items-start mb-14">
+            <div className="flex gap-10 items-center">
               <img src={LOGO_URL} alt="Logo" className="w-24 h-24 object-contain grayscale" />
-              <div className="border-l-2 border-slate-200 pl-8">
-                <h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1 text-slate-900">Gonzacars C.A.</h1>
-                <p className="text-sm font-black text-slate-500 tracking-[0.1em] uppercase">Informe Técnico y Estado de Cuenta</p>
-                <p className="text-[10px] font-bold text-slate-400 mt-2">Valencia, Edo. Carabobo | RIF: J-50030426-9</p>
+              <div className="border-l-[3px] border-slate-100 pl-10">
+                <h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1 text-slate-950">GONZACARS C.A.</h1>
+                <p className="text-lg font-black text-slate-800 tracking-tight leading-tight uppercase max-w-sm">INFORME TÉCNICO Y ESTADO DE CUENTA</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-4 tracking-widest uppercase">Valencia, Edo. Carabobo | RIF: J-50030426-9</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-black text-slate-900">ORDEN REF: <span className="text-blue-600">#{currentRepair.id.toUpperCase().slice(-8)}</span></p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Fecha Reporte: {new Date().toLocaleDateString()}</p>
+              <div className="mb-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ORDEN REF:</p>
+                <p className="text-2xl font-black text-blue-600">#{currentRepair.id.toUpperCase().slice(-8)}</p>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">FECHA REPORTE: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
-          <div className="h-[1px] bg-slate-900 w-full mb-10"></div>
-
-          {/* Bloques de Información (Cajas gemelas del screenshot) */}
-          <div className="grid grid-cols-2 gap-10 mb-10">
-            <div className="bg-white border-2 border-slate-100 p-8 rounded-none relative">
-              <h3 className="absolute -top-3 left-4 bg-white px-3 font-black text-slate-400 uppercase tracking-widest text-[10px]">Titular de la Cuenta</h3>
+          {/* Bloques de Datos Cliente / Vehículo */}
+          <div className="grid grid-cols-2 gap-12 mb-14">
+            <div className="border-[2px] border-slate-100 p-8 relative">
+              <h3 className="absolute -top-3 left-6 bg-white px-4 font-black text-slate-400 uppercase tracking-widest text-[9px]">TITULAR DE LA CUENTA</h3>
               <div className="space-y-1">
-                <p className="font-black text-xl text-slate-900 uppercase leading-none">{currentRepair.ownerName}</p>
-                <p className="text-xs font-bold text-slate-500">ID: {currentRepair.customerId}</p>
+                <p className="font-black text-2xl text-slate-900 uppercase leading-none">{currentRepair.ownerName}</p>
+                <p className="text-xs font-bold text-slate-400 mt-2">ID: {currentRepair.customerId}</p>
               </div>
             </div>
-            <div className="bg-white border-2 border-slate-100 p-8 rounded-none relative">
-              <h3 className="absolute -top-3 left-4 bg-white px-3 font-black text-slate-400 uppercase tracking-widest text-[10px]">Detalle Vehículo</h3>
+            <div className="border-[2px] border-slate-100 p-8 relative">
+              <h3 className="absolute -top-3 left-6 bg-white px-4 font-black text-slate-400 uppercase tracking-widest text-[9px]">DETALLE VEHÍCULO</h3>
               <div className="space-y-1">
-                <p className="font-black text-xl text-slate-900 uppercase leading-none">{currentRepair.brand} {currentRepair.model}</p>
-                <p className="text-xs font-black text-blue-600 tracking-widest">{currentRepair.plate.toUpperCase()}</p>
+                <p className="font-black text-2xl text-slate-900 uppercase leading-none">{currentRepair.brand} {currentRepair.model}</p>
+                <p className="text-xs font-black text-blue-600 tracking-[0.2em] uppercase mt-2">{currentRepair.plate.toUpperCase()}</p>
               </div>
             </div>
           </div>
 
-          {/* Diagnóstico Técnico */}
-          <div className="mb-10">
-             <h4 className="font-black text-slate-900 uppercase text-[11px] tracking-widest mb-3 flex items-center gap-2">
-                <ClipboardList size={14} className="text-blue-600" /> Diagnóstico y Requerimiento
-             </h4>
-             <div className="p-8 bg-slate-50 border-l-4 border-slate-900 text-sm italic text-slate-600 leading-relaxed font-medium">
-                {currentRepair.diagnosis || "Sin diagnóstico adicional registrado."}
+          {/* Diagnóstico */}
+          <div className="mb-14">
+             <div className="flex items-center gap-3 mb-6">
+                <h4 className="font-black text-slate-900 uppercase text-xs tracking-widest">DIAGNÓSTICO Y REQUERIMIENTO</h4>
+             </div>
+             <div className="p-10 border-l-[6px] border-slate-900 bg-slate-50/50 text-xl italic text-slate-700 leading-relaxed font-semibold">
+                {currentRepair.diagnosis || "No se especificaron observaciones adicionales."}
              </div>
           </div>
 
-          {/* Tabla de Cargos (Rediseñada para incluir Cant, Precio, Total) */}
-          <div className="mb-12">
+          {/* Tabla Maestra con Cantidades, Precios y Totales */}
+          <div className="mb-14">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-white">
-                  <th className="p-4 uppercase tracking-widest font-black text-[9px]">Fecha</th>
-                  <th className="p-4 uppercase tracking-widest font-black text-[9px]">Concepto / Descripción</th>
-                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-center">Cant.</th>
-                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-right">Débito (+)</th>
-                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-right">Saldo USD</th>
+                <tr className="bg-white border-b-2 border-slate-100">
+                  <th className="py-6 px-4 uppercase tracking-widest font-black text-[9px] text-slate-400">FECHA</th>
+                  <th className="py-6 px-4 uppercase tracking-widest font-black text-[9px] text-slate-400">CONCEPTO / DESCRIPCIÓN</th>
+                  <th className="py-6 px-4 uppercase tracking-widest font-black text-[9px] text-slate-400 text-center">CANT.</th>
+                  <th className="py-6 px-4 uppercase tracking-widest font-black text-[9px] text-slate-400 text-right">DÉBITO (+)</th>
+                  <th className="py-6 px-4 uppercase tracking-widest font-black text-[9px] text-slate-400 text-right">SALDO USD</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                {currentRepair.items.map((item, idx) => {
-                  const subtotal = item.price * item.quantity;
-                  return (
-                    <tr key={idx} className="odd:bg-white even:bg-slate-50/50">
-                      <td className="p-4 text-[10px] font-bold text-slate-400">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
-                      <td className="p-4">
-                        <p className="font-black text-slate-800 uppercase text-xs leading-tight">{item.description}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{item.type} {item.productId ? `| REF: ${item.productId}` : ''}</p>
-                      </td>
-                      <td className="p-4 text-center font-black text-slate-900 text-xs">{item.quantity}</td>
-                      <td className="p-4 text-right font-bold text-slate-500 text-xs">${item.price.toFixed(2)}</td>
-                      <td className="p-4 text-right font-black text-slate-900 text-sm">${subtotal.toFixed(2)}</td>
-                    </tr>
-                  );
-                })}
-                {/* Abonos realizados */}
-                {currentRepair.installments?.map((inst, idx) => (
-                  <tr key={`inst-${idx}`} className="bg-emerald-50/30">
-                    <td className="p-4 text-[10px] font-bold text-slate-400">{new Date(inst.date).toLocaleDateString()}</td>
-                    <td className="p-4">
-                      <p className="font-black text-emerald-700 uppercase text-xs leading-tight">ABONO RECIBIDO ({inst.method})</p>
+              <tbody className="divide-y divide-slate-50">
+                {/* Cargos de Repuestos / Servicios */}
+                {currentRepair.items.map((item, idx) => (
+                  <tr key={idx} className="group">
+                    <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
+                    <td className="py-8 px-4">
+                      <p className="font-black text-slate-900 uppercase text-sm leading-tight mb-1">{item.description}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.type} {item.productId ? `| REF: ${item.productId}` : ''}</p>
                     </td>
-                    <td className="p-4 text-center">-</td>
-                    <td className="p-4 text-right font-black text-emerald-600 text-xs">-${inst.amount.toFixed(2)}</td>
-                    <td className="p-4 text-right font-bold text-slate-300 text-sm">CRÉDITO</td>
+                    <td className="py-8 px-4 text-center font-black text-slate-900 text-base">{item.quantity}</td>
+                    <td className="py-8 px-4 text-right font-black text-slate-900 text-base">${item.price.toFixed(2)}</td>
+                    <td className="py-8 px-4 text-right font-black text-slate-900 text-lg tracking-tighter">${(item.price * item.quantity).toFixed(2)}</td>
+                  </tr>
+                ))}
+                
+                {/* Relación de Abonos */}
+                {currentRepair.installments?.map((inst, idx) => (
+                  <tr key={`inst-${idx}`} className="bg-slate-50/20">
+                    <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(inst.date).toLocaleDateString()}</td>
+                    <td className="py-8 px-4">
+                      <p className="font-black text-emerald-700 uppercase text-sm leading-tight">ABONO RECIBIDO ({inst.method})</p>
+                    </td>
+                    <td className="py-8 px-4 text-center font-bold text-slate-300">-</td>
+                    <td className="py-8 px-4 text-right font-black text-emerald-600 text-base">-${inst.amount.toFixed(2)}</td>
+                    <td className="py-8 px-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">CRÉDITO</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Caja de Total (Estilo del screenshot) */}
-          <div className="flex justify-end mb-20">
-             <div className="w-80 border-[3px] border-slate-900 p-8 text-right">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Saldo Pendiente</p>
-                <p className="text-4xl font-black text-slate-900 tracking-tighter leading-none">${calculateBalance().toFixed(2)} USD</p>
+          {/* Caja de Total Balance Final */}
+          <div className="flex justify-end mb-24">
+             <div className="w-[420px] border-[4px] border-slate-950 p-10 text-right relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-slate-950 rotate-45 translate-x-12 -translate-y-12"></div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3">TOTAL SALDO PENDIENTE</p>
+                <p className="text-6xl font-black text-slate-950 tracking-tighter leading-none mb-8">${calculateBalance().toFixed(2)} USD</p>
                 
-                <div className="mt-6 pt-6 border-t-2 border-slate-100">
-                  <p className="text-xl font-black text-slate-800 tracking-tight">Equiv: {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 italic">Tasa Ref: {store.exchangeRate} Bs/$</p>
+                <div className="pt-8 border-t-2 border-slate-100">
+                  <p className="text-2xl font-black text-slate-800 tracking-tight">Equiv: {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest">Tasa Ref: {store.exchangeRate} Bs/$</p>
                 </div>
              </div>
           </div>
 
-          {/* Firmas (Basado en screenshot) */}
-          <div className="grid grid-cols-2 gap-20 px-10 text-center font-black uppercase text-[10px] tracking-widest mt-auto">
-            <div className="border-t-2 border-slate-900 pt-4">
-              Firma Autorizada
+          {/* Firmas en la base */}
+          <div className="grid grid-cols-2 gap-32 px-10 text-center font-black uppercase text-[10px] tracking-[0.3em] mt-auto">
+            <div className="border-t-[2px] border-slate-950 pt-6">
+              FIRMA AUTORIZADA
             </div>
-            <div className="border-t-2 border-slate-900 pt-4">
-              Conformidad Cliente
+            <div className="border-t-[2px] border-slate-950 pt-6">
+              CONFORMIDAD CLIENTE
             </div>
           </div>
 
-          {/* Footer de Página con Logo Mini */}
-          <div className="mt-20 border-t border-slate-100 pt-10 text-center">
-             <img src={LOGO_URL} alt="Logo Small" className="w-12 h-12 object-contain grayscale mx-auto mb-4 opacity-50" />
-             <h4 className="text-sm font-black uppercase text-slate-900">Gonzacars C.A.</h4>
-             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">RIF: J-50030426-9</p>
-             <p className="text-[8px] font-medium text-slate-400 mt-1 uppercase">Av Bolivar norte; Calle Miranda Valencia Carabobo</p>
+          <div className="mt-32 pt-10 border-t border-slate-100 flex justify-between items-center opacity-40">
+             <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest">https://gonzacars-sistem.vercel.app</div>
+             <div className="text-[9px] font-black uppercase text-slate-500">Página 1 / 1</div>
           </div>
         </div>
       )}
 
-      {/* UI DE LA APLICACIÓN (NO-PRINT) */}
+      {/* UI DE LA APLICACIÓN (PARA USO EN PANTALLA) */}
       <div className="print:hidden h-full flex flex-col">
-        {/* Buscador de Órdenes */}
+        {/* Buscador de Órdenes con diseño refinado */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 flex gap-4 no-print animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="relative flex-1">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={24}/>
             <input 
               type="text" 
-              placeholder="Buscar vehículo por placa..." 
+              placeholder="Ingrese placa del vehículo (Ej: AC302PV)..." 
               className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] uppercase outline-none focus:ring-4 focus:ring-blue-50 font-black tracking-widest transition-all shadow-inner"
               value={searchPlate}
               onChange={(e) => setSearchPlate(e.target.value)}
@@ -377,7 +376,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
         {currentRepair ? (
           <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col animate-in fade-in zoom-in-95 duration-500 relative">
-            {/* Header de la App */}
+            {/* Header del Panel del Vehículo */}
             <div className="p-10 bg-slate-950 text-white flex justify-between items-start relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
                 <Wrench size={240} />
@@ -428,6 +427,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
             </div>
 
+            {/* Contenido Detallado */}
             <div className="p-10 space-y-12 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/20">
               <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 relative shadow-sm">
                 <div className="absolute -top-5 left-12 bg-blue-600 text-white px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl">
@@ -436,6 +436,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <p className="text-slate-700 italic leading-relaxed font-semibold text-xl pt-4">"{currentRepair.diagnosis || 'Pendiente por diagnóstico.'}"</p>
               </div>
 
+              {/* Detalle de Cargos */}
               <div className="space-y-8">
                 <div className="flex justify-between items-center px-4">
                   <h3 className="text-3xl font-black text-slate-950 uppercase tracking-tighter flex items-center gap-4">
@@ -454,6 +455,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </div>
                 </div>
 
+                {/* Tabla de Cargos en App */}
                 <div className="overflow-hidden border-4 border-slate-950 rounded-[3.5rem] shadow-2xl bg-white">
                   <table className="w-full border-collapse">
                     <thead>
@@ -484,9 +486,9 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                           </td>
                           <td className="px-10 py-7">
                             <div className="flex items-center justify-center gap-4">
-                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="w-9 h-9 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Minus size={14}/></button>
+                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Minus size={12}/></button>
                               <span className="font-black text-slate-900 text-lg min-w-[30px] text-center">{item.quantity}</span>
-                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="w-9 h-9 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Plus size={14}/></button>
+                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Plus size={12}/></button>
                             </div>
                           </td>
                           <td className="px-10 py-7 text-right">
@@ -515,10 +517,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </div>
               </div>
 
-              {/* Botones de Acción de Impresión */}
+              {/* Botones de Acción */}
               <div className="flex flex-wrap gap-6 pt-12 border-t-2 border-slate-100 no-print">
                 <button onClick={() => window.print()} className="flex-1 bg-white border-4 border-slate-950 py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] flex items-center justify-center gap-5 hover:bg-slate-50 shadow-2xl transition-all active:scale-[0.98]">
-                  <Printer size={30}/> Imprimir Reporte Técnico PDF
+                  <Printer size={30}/> Imprimir Informe Técnico PDF
                 </button>
                 {currentRepair.status !== 'Entregado' && (
                   <button onClick={() => setShowPayModal(true)} className="flex-1 bg-blue-600 text-white py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] flex items-center justify-center gap-5 hover:bg-blue-700 shadow-2xl transition-all active:scale-[0.98]">
@@ -541,7 +543,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         )}
       </div>
 
-      {/* MODALES EXISTENTES PARA ABONO, INVENTARIO, ETC. */}
+      {/* MODALES REFINADOS */}
       {showInventorySearch && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[4rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border-8 border-slate-100">
@@ -755,7 +757,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </select>
                </div>
                <button onClick={finalizeRepair} className="w-full py-8 bg-slate-950 text-white rounded-[3rem] font-black uppercase text-sm tracking-[0.4em] hover:bg-black shadow-2xl transition-all active:scale-95">
-                 Liquidar y Generar PDF Final
+                 Liquidar e Imprimir Reporte Final
                </button>
                <button onClick={() => setShowPayModal(false)} className="w-full py-4 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:text-red-500 transition-colors">Volver</button>
             </div>
