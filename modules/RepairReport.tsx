@@ -44,6 +44,14 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [abonoAmount, setAbonoAmount] = useState<number>(0);
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
 
+  const filteredInventory = useMemo(() => {
+    return (store.inventory || []).filter((p: Product) => 
+      p.name.toLowerCase().includes(invSearchTerm.toLowerCase()) ||
+      p.category.toLowerCase().includes(invSearchTerm.toLowerCase()) ||
+      p.barcode?.includes(invSearchTerm)
+    );
+  }, [store.inventory, invSearchTerm]);
+
   const handleSearch = () => {
     if (!searchPlate.trim()) {
       alert('Por favor ingrese una placa');
@@ -75,7 +83,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     const newItem: RepairItem = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      description: type === 'Servicio' ? 'Mano de obra' : 
+      description: type === 'Servicio' ? 'Mano de obra especializada' : 
                    type === 'Consumible' ? 'Insumo técnico' : '',
       quantity: 1,
       price: 0
@@ -130,84 +138,26 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
   const calculateBalance = () => calculateTotal() - calculatePaid();
 
-  const getBalanceAfterInstallment = (installmentId: string) => {
-    if (!currentRepair) return 0;
-    const total = calculateTotal();
-    const installments = [...(currentRepair.installments || [])].sort((a, b) => a.date.localeCompare(b.date));
-    let runningPaid = 0;
-    for (const inst of installments) {
-      runningPaid += inst.amount;
-      if (inst.id === installmentId) break;
-    }
-    return total - runningPaid;
-  };
-
-  const accountStatementLedger = useMemo(() => {
-    if (!currentRepair) return [];
-    
-    const totalCost = calculateTotal();
-    const ledger = [];
-    
-    ledger.push({
-      date: currentRepair.createdAt,
-      description: 'CARGO POR SERVICIOS Y REPUESTOS',
-      debit: totalCost,
-      credit: 0,
-      balance: totalCost
-    });
-
-    let runningBalance = totalCost;
-    const sortedInstallments = [...(currentRepair.installments || [])].sort((a, b) => a.date.localeCompare(b.date));
-    
-    sortedInstallments.forEach(inst => {
-      runningBalance -= inst.amount;
-      ledger.push({
-        date: inst.date,
-        description: `ABONO RECIBIDO (${inst.method.toUpperCase()})`,
-        debit: 0,
-        credit: inst.amount,
-        balance: runningBalance
-      });
-    });
-
-    return ledger;
-  }, [currentRepair]);
-
-  const filteredInventory = useMemo(() => {
-    const inv = store.inventory || [];
-    return inv.filter((p: Product) => 
-      p.name.toLowerCase().includes(invSearchTerm.toLowerCase()) || 
-      (p.barcode && p.barcode.toLowerCase().includes(invSearchTerm.toLowerCase()))
-    );
-  }, [store.inventory, invSearchTerm]);
-
   const registerAbono = () => {
-    if (!currentRepair || abonoAmount <= 0) return;
-    const balance = calculateBalance();
-    if (abonoAmount > balance) {
-      alert(`El abono ($${abonoAmount}) no puede ser mayor al saldo pendiente ($${balance.toFixed(2)})`);
+    if (!currentRepair || abonoAmount <= 0) {
+      alert('Ingrese un monto válido');
       return;
     }
-
     const newInstallment: Installment = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `abono-${Date.now()}`,
       date: new Date().toISOString(),
       amount: abonoAmount,
       method: abonoMethod
     };
-
     const updated: VehicleRepair = {
       ...currentRepair,
       installments: [...(currentRepair.installments || []), newInstallment]
     };
-
-    store.updateRepair(updated);
     setCurrentRepair(updated);
+    store.updateRepair(updated);
     setShowAbonoModal(false);
     setAbonoAmount(0);
-    
-    setSelectedInstallment(newInstallment);
-    setShowReceiptModal(true);
+    alert('Abono registrado con éxito');
   };
 
   const finalizeRepair = () => {
@@ -279,198 +229,141 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       
-      {/* SECCIÓN DE IMPRESIÓN DE INFORME TÉCNICO DETALLADO (PDF) */}
+      {/* SECCIÓN DE IMPRESIÓN DE INFORME (ESTILO PDF ADJUNTO) */}
       {currentRepair && (
-        <div className="hidden print:block print-only p-12 bg-white text-slate-900 font-sans">
-          {/* Header Corporativo Refinado */}
-          <div className="flex justify-between items-start border-b-8 border-slate-950 pb-8 mb-10">
+        <div className="hidden print:block print-only p-12 bg-white text-slate-900 font-sans min-h-screen">
+          {/* Header - Basado en Screenshot */}
+          <div className="flex justify-between items-start mb-10">
             <div className="flex gap-8 items-center">
-              <img src={LOGO_URL} alt="Logo" className="w-28 h-28 object-contain grayscale" />
-              <div>
-                <h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1">Gonzacars C.A.</h1>
-                <p className="text-sm font-black text-slate-500 tracking-[0.25em] uppercase">Taller Mecánico Especializado y Venta de Repuestos</p>
-                <div className="mt-4 text-[11px] font-bold text-slate-600 space-y-1">
-                  <p>RIF: J-50030426-9</p>
-                  <p>DIRECCIÓN: Av. Bolivar norte; Calle Miranda, Local 113-109C, Valencia, Edo. Carabobo.</p>
-                  <p>TELÉFONO: (0412) 000-0000 | @gonzacars.ca</p>
-                </div>
+              <img src={LOGO_URL} alt="Logo" className="w-24 h-24 object-contain grayscale" />
+              <div className="border-l-2 border-slate-200 pl-8">
+                <h1 className="text-4xl font-black uppercase tracking-tighter leading-none mb-1 text-slate-900">Gonzacars C.A.</h1>
+                <p className="text-sm font-black text-slate-500 tracking-[0.1em] uppercase">Informe Técnico y Estado de Cuenta</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-2">Valencia, Edo. Carabobo | RIF: J-50030426-9</p>
               </div>
             </div>
-            <div className="text-right flex flex-col items-end">
-              <div className="bg-slate-950 text-white px-10 py-5 rounded-[2rem] mb-6 shadow-xl text-center">
-                <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-1 opacity-60">Informe de Servicio</h2>
-                <p className="text-3xl font-black tracking-tighter">#{currentRepair.id.toUpperCase().slice(-8)}</p>
-              </div>
-              <div className="space-y-1 text-[11px] font-black uppercase text-slate-400 tracking-widest text-right">
-                <p>Ingreso: {new Date(currentRepair.createdAt).toLocaleDateString()}</p>
-                {currentRepair.finishedAt && (
-                  <p className="text-emerald-600 font-black border-t border-slate-100 pt-1 mt-1">Entrega: {new Date(currentRepair.finishedAt).toLocaleDateString()}</p>
-                )}
-              </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-900">ORDEN REF: <span className="text-blue-600">#{currentRepair.id.toUpperCase().slice(-8)}</span></p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Fecha Reporte: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
-          {/* Grid de Información Cliente/Vehículo */}
-          <div className="grid grid-cols-2 gap-8 mb-10">
-            <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-200">
-              <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px] mb-4 border-b border-slate-200 pb-2">Datos del Cliente</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Titular:</span>
-                  <span className="font-black text-slate-900 uppercase">{currentRepair.ownerName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Cédula/RIF:</span>
-                  <span className="font-black text-slate-900">{currentRepair.customerId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Asesor:</span>
-                  <span className="font-black text-slate-900 uppercase">{currentRepair.responsible}</span>
-                </div>
+          <div className="h-[1px] bg-slate-900 w-full mb-10"></div>
+
+          {/* Bloques de Información (Cajas gemelas del screenshot) */}
+          <div className="grid grid-cols-2 gap-10 mb-10">
+            <div className="bg-white border-2 border-slate-100 p-8 rounded-none relative">
+              <h3 className="absolute -top-3 left-4 bg-white px-3 font-black text-slate-400 uppercase tracking-widest text-[10px]">Titular de la Cuenta</h3>
+              <div className="space-y-1">
+                <p className="font-black text-xl text-slate-900 uppercase leading-none">{currentRepair.ownerName}</p>
+                <p className="text-xs font-bold text-slate-500">ID: {currentRepair.customerId}</p>
               </div>
             </div>
-            <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-200">
-              <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px] mb-4 border-b border-slate-200 pb-2">Información del Vehículo</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Placa:</span>
-                  <span className="bg-slate-950 text-white px-4 py-1 rounded-xl font-mono font-black text-lg shadow-sm">{currentRepair.plate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Unidad:</span>
-                  <span className="font-black text-slate-900 uppercase">{currentRepair.brand} {currentRepair.model} ({currentRepair.year})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 uppercase text-[10px]">Estatus:</span>
-                  <span className="font-black text-blue-600 uppercase">{currentRepair.status}</span>
-                </div>
+            <div className="bg-white border-2 border-slate-100 p-8 rounded-none relative">
+              <h3 className="absolute -top-3 left-4 bg-white px-3 font-black text-slate-400 uppercase tracking-widest text-[10px]">Detalle Vehículo</h3>
+              <div className="space-y-1">
+                <p className="font-black text-xl text-slate-900 uppercase leading-none">{currentRepair.brand} {currentRepair.model}</p>
+                <p className="text-xs font-black text-blue-600 tracking-widest">{currentRepair.plate.toUpperCase()}</p>
               </div>
             </div>
           </div>
 
           {/* Diagnóstico Técnico */}
           <div className="mb-10">
-            <h3 className="font-black text-slate-950 uppercase text-[11px] tracking-[0.2em] mb-4 flex items-center gap-2">
-              <ClipboardList size={18} className="text-blue-600" /> Detalle Técnico del Requerimiento
-            </h3>
-            <div className="p-10 bg-slate-50 border-4 border-slate-100 rounded-[3rem] text-base leading-relaxed text-slate-700 italic font-medium min-h-[120px] relative shadow-inner">
-               <div className="absolute top-6 right-8 text-slate-200 opacity-20"><Wrench size={60} /></div>
-               {currentRepair.diagnosis || "No se especificaron observaciones adicionales."}
-            </div>
+             <h4 className="font-black text-slate-900 uppercase text-[11px] tracking-widest mb-3 flex items-center gap-2">
+                <ClipboardList size={14} className="text-blue-600" /> Diagnóstico y Requerimiento
+             </h4>
+             <div className="p-8 bg-slate-50 border-l-4 border-slate-900 text-sm italic text-slate-600 leading-relaxed font-medium">
+                {currentRepair.diagnosis || "Sin diagnóstico adicional registrado."}
+             </div>
           </div>
 
-          {/* Tabla Maestra de Cargos: Repuestos, Consumibles y Mano de Obra */}
-          <div className="mb-12 overflow-hidden border-4 border-slate-950 rounded-[3rem] shadow-2xl">
-            <table className="w-full text-[12px] border-collapse">
+          {/* Tabla de Cargos (Rediseñada para incluir Cant, Precio, Total) */}
+          <div className="mb-12">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-950 text-white text-left">
-                  <th className="p-5 uppercase tracking-[0.2em] font-black text-[9px]">Categoría</th>
-                  <th className="p-5 uppercase tracking-[0.2em] font-black text-[9px]">Descripción Detallada</th>
-                  <th className="p-5 uppercase tracking-[0.2em] font-black text-[9px] text-center">Cant.</th>
-                  <th className="p-5 uppercase tracking-[0.2em] font-black text-[9px] text-right">Unitario ($)</th>
-                  <th className="p-5 uppercase tracking-[0.2em] font-black text-[9px] text-right">Subtotal ($)</th>
+                <tr className="bg-slate-900 text-white">
+                  <th className="p-4 uppercase tracking-widest font-black text-[9px]">Fecha</th>
+                  <th className="p-4 uppercase tracking-widest font-black text-[9px]">Concepto / Descripción</th>
+                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-center">Cant.</th>
+                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-right">Débito (+)</th>
+                  <th className="p-4 uppercase tracking-widest font-black text-[9px] text-right">Saldo USD</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {currentRepair.items.map((item, idx) => (
-                  <tr key={idx} className="odd:bg-white even:bg-slate-50/50">
-                    <td className="p-5">
-                      <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest border-2 ${getItemTypeStyles(item.type)}`}>
-                        {item.type}
-                      </span>
+                {currentRepair.items.map((item, idx) => {
+                  const subtotal = item.price * item.quantity;
+                  return (
+                    <tr key={idx} className="odd:bg-white even:bg-slate-50/50">
+                      <td className="p-4 text-[10px] font-bold text-slate-400">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
+                      <td className="p-4">
+                        <p className="font-black text-slate-800 uppercase text-xs leading-tight">{item.description}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{item.type} {item.productId ? `| REF: ${item.productId}` : ''}</p>
+                      </td>
+                      <td className="p-4 text-center font-black text-slate-900 text-xs">{item.quantity}</td>
+                      <td className="p-4 text-right font-bold text-slate-500 text-xs">${item.price.toFixed(2)}</td>
+                      <td className="p-4 text-right font-black text-slate-900 text-sm">${subtotal.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+                {/* Abonos realizados */}
+                {currentRepair.installments?.map((inst, idx) => (
+                  <tr key={`inst-${idx}`} className="bg-emerald-50/30">
+                    <td className="p-4 text-[10px] font-bold text-slate-400">{new Date(inst.date).toLocaleDateString()}</td>
+                    <td className="p-4">
+                      <p className="font-black text-emerald-700 uppercase text-xs leading-tight">ABONO RECIBIDO ({inst.method})</p>
                     </td>
-                    <td className="p-5 font-black text-slate-800 uppercase text-[11px] leading-tight">{item.description}</td>
-                    <td className="p-5 text-center font-black text-slate-950">{item.quantity}</td>
-                    <td className="p-5 text-right font-bold text-slate-500">${item.price.toFixed(2)}</td>
-                    <td className="p-5 text-right font-black text-slate-950 text-base tracking-tighter">${(item.price * item.quantity).toFixed(2)}</td>
+                    <td className="p-4 text-center">-</td>
+                    <td className="p-4 text-right font-black text-emerald-600 text-xs">-${inst.amount.toFixed(2)}</td>
+                    <td className="p-4 text-right font-bold text-slate-300 text-sm">CRÉDITO</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Resumen Financiero en Pie de Página */}
-          <div className="flex justify-between items-start gap-16 mb-16">
-            <div className="flex-1">
-              <h3 className="font-black text-slate-950 uppercase text-[11px] tracking-[0.2em] mb-4 flex items-center gap-2">
-                <History size={16} className="text-emerald-600" /> Relación de Pagos Registrados
-              </h3>
-              <div className="bg-slate-50 border-2 border-slate-200 rounded-[2.5rem] overflow-hidden">
-                <table className="w-full text-[11px]">
-                  <thead>
-                    <tr className="bg-slate-200 text-slate-600">
-                      <th className="p-3 text-left uppercase font-black text-[9px] tracking-widest">Fecha</th>
-                      <th className="p-3 text-left uppercase font-black text-[9px] tracking-widest">Método</th>
-                      <th className="p-3 text-right uppercase font-black text-[9px] tracking-widest">Abono ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {currentRepair.installments?.map((inst, idx) => (
-                      <tr key={idx} className="bg-white">
-                        <td className="p-3 font-bold text-slate-500">{new Date(inst.date).toLocaleDateString()}</td>
-                        <td className="p-3 uppercase font-black text-slate-800">{inst.method}</td>
-                        <td className="p-3 text-right font-black text-emerald-600 text-sm">${inst.amount.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    {!currentRepair.installments?.length && (
-                      <tr><td colSpan={3} className="p-6 text-center italic text-slate-300 font-bold uppercase text-[10px] tracking-widest">No se registran pagos previos</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+          {/* Caja de Total (Estilo del screenshot) */}
+          <div className="flex justify-end mb-20">
+             <div className="w-80 border-[3px] border-slate-900 p-8 text-right">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Saldo Pendiente</p>
+                <p className="text-4xl font-black text-slate-900 tracking-tighter leading-none">${calculateBalance().toFixed(2)} USD</p>
+                
+                <div className="mt-6 pt-6 border-t-2 border-slate-100">
+                  <p className="text-xl font-black text-slate-800 tracking-tight">Equiv: {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 italic">Tasa Ref: {store.exchangeRate} Bs/$</p>
+                </div>
+             </div>
+          </div>
+
+          {/* Firmas (Basado en screenshot) */}
+          <div className="grid grid-cols-2 gap-20 px-10 text-center font-black uppercase text-[10px] tracking-widest mt-auto">
+            <div className="border-t-2 border-slate-900 pt-4">
+              Firma Autorizada
             </div>
-            
-            <div className="w-96 bg-slate-950 text-white p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden border-8 border-slate-900">
-               <div className="absolute top-0 right-0 opacity-10 p-4 rotate-12"><DollarSign size={100} /></div>
-               <div className="space-y-5 relative z-10">
-                  <div className="flex justify-between items-center text-slate-500">
-                    <span className="uppercase font-black text-[10px] tracking-[0.3em]">Monto Total Orden</span>
-                    <span className="font-black text-lg tracking-tighter">${calculateTotal().toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-emerald-500 pb-6 border-b border-white/10">
-                    <span className="uppercase font-black text-[10px] tracking-[0.3em]">Total Abonado</span>
-                    <span className="font-black text-lg tracking-tighter">-${calculatePaid().toFixed(2)}</span>
-                  </div>
-                  <div className="pt-2 flex justify-between items-center">
-                    <span className="uppercase font-black text-[12px] tracking-[0.4em] text-blue-500">Saldo Pendiente</span>
-                    <span className="text-5xl font-black tracking-tighter leading-none">${calculateBalance().toFixed(2)}</span>
-                  </div>
-                  <div className="mt-6 pt-6 border-t border-white/20 text-right">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Monto en Bolívares (Ref)</p>
-                    <p className="text-2xl font-black text-emerald-400">{(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
-                    <p className="text-[9px] font-bold text-slate-600 italic mt-1">Tasa: {store.exchangeRate} Bs/$</p>
-                  </div>
-               </div>
+            <div className="border-t-2 border-slate-900 pt-4">
+              Conformidad Cliente
             </div>
           </div>
 
-          {/* Firmas de Conformidad */}
-          <div className="mt-28 grid grid-cols-2 gap-40 px-20 text-center font-black uppercase text-[11px] tracking-[0.3em]">
-            <div className="border-t-4 border-slate-950 pt-6">
-              <p className="mb-1">Control de Calidad</p>
-              <p className="text-[9px] font-bold text-slate-400">GONZACARS C.A.</p>
-            </div>
-            <div className="border-t-4 border-slate-950 pt-6">
-              <p className="mb-1">Recibido Conforme</p>
-              <p className="text-[9px] font-bold text-slate-400">CLIENTE</p>
-            </div>
-          </div>
-
-          <div className="mt-20 text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em] leading-relaxed">
-             Documento informativo generado por Gonzacars C.A. para control de servicio técnico.
+          {/* Footer de Página con Logo Mini */}
+          <div className="mt-20 border-t border-slate-100 pt-10 text-center">
+             <img src={LOGO_URL} alt="Logo Small" className="w-12 h-12 object-contain grayscale mx-auto mb-4 opacity-50" />
+             <h4 className="text-sm font-black uppercase text-slate-900">Gonzacars C.A.</h4>
+             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">RIF: J-50030426-9</p>
+             <p className="text-[8px] font-medium text-slate-400 mt-1 uppercase">Av Bolivar norte; Calle Miranda Valencia Carabobo</p>
           </div>
         </div>
       )}
 
       {/* UI DE LA APLICACIÓN (NO-PRINT) */}
       <div className="print:hidden h-full flex flex-col">
-        {/* Buscador de Órdenes Mejorado */}
+        {/* Buscador de Órdenes */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 flex gap-4 no-print animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="relative flex-1">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={24}/>
             <input 
               type="text" 
-              placeholder="Buscar por placa del vehículo (Ej: ABC12DE)..." 
+              placeholder="Buscar vehículo por placa..." 
               className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] uppercase outline-none focus:ring-4 focus:ring-blue-50 font-black tracking-widest transition-all shadow-inner"
               value={searchPlate}
               onChange={(e) => setSearchPlate(e.target.value)}
@@ -478,13 +371,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             />
           </div>
           <button onClick={handleSearch} className="bg-slate-950 text-white px-12 py-5 rounded-[2rem] hover:bg-black flex items-center gap-4 font-black uppercase text-xs tracking-widest transition-all active:scale-95 shadow-xl shadow-slate-200">
-            <Search size={22}/> Consultar Orden
+            <Search size={22}/> Localizar Orden
           </button>
         </div>
 
         {currentRepair ? (
           <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col animate-in fade-in zoom-in-95 duration-500 relative">
-            {/* Header del Panel de Control */}
+            {/* Header de la App */}
             <div className="p-10 bg-slate-950 text-white flex justify-between items-start relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
                 <Wrench size={240} />
@@ -512,33 +405,41 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
               <div className="text-right relative z-10 flex flex-col items-end gap-5">
                 <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-end">
-                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Presupuesto Estimado</p>
+                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Presupuesto Total Estimado</p>
                     <p className="text-5xl font-black tracking-tighter text-blue-400 leading-none">${calculateTotal().toFixed(2)}</p>
                     <div className="mt-4 pt-4 border-t border-white/5 w-full text-right">
                        <p className="text-[10px] font-bold text-emerald-400 tracking-tight">{(calculateTotal() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
                     </div>
                 </div>
-                <button 
-                  onClick={() => setShowSOAModal(true)}
-                  className="bg-emerald-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-950/40"
-                >
-                  <FileText size={18} /> Ver Estado de Cuenta
-                </button>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowAbonoModal(true)}
+                    className="bg-blue-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-950/40"
+                  >
+                    <DollarSign size={18} /> Registrar Abono
+                  </button>
+                  <button 
+                    onClick={() => setShowSOAModal(true)}
+                    className="bg-emerald-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-950/40"
+                  >
+                    <FileText size={18} /> Ver Estado de Cuenta
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="p-10 space-y-12 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/20">
               <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 relative shadow-sm">
                 <div className="absolute -top-5 left-12 bg-blue-600 text-white px-8 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl">
-                    Diagnóstico Técnico Inicial
+                    Diagnóstico Técnico Detallado
                 </div>
-                <p className="text-slate-700 italic leading-relaxed font-semibold text-xl pt-4">"{currentRepair.diagnosis || 'Pendiente por definir.'}"</p>
+                <p className="text-slate-700 italic leading-relaxed font-semibold text-xl pt-4">"{currentRepair.diagnosis || 'Pendiente por diagnóstico.'}"</p>
               </div>
 
               <div className="space-y-8">
                 <div className="flex justify-between items-center px-4">
                   <h3 className="text-3xl font-black text-slate-950 uppercase tracking-tighter flex items-center gap-4">
-                    <Layers size={34} className="text-blue-600" /> Detalle de Cargos
+                    <Layers size={34} className="text-blue-600" /> Detalle de Cargos a la Orden
                   </h3>
                   <div className="flex gap-4">
                     <button onClick={() => setShowInventorySearch(true)} className="px-8 py-4 bg-blue-600 text-white rounded-[1.8rem] text-[11px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-95">
@@ -560,7 +461,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                         <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] border-r border-white/5">Categoría</th>
                         <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] border-r border-white/5">Descripción del Item</th>
                         <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] text-center border-r border-white/5">Cant.</th>
-                        <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] text-right border-r border-white/5">Precio Unit. ($)</th>
+                        <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] text-right border-r border-white/5">P. Unit. ($)</th>
                         <th className="px-10 py-7 text-[12px] font-black uppercase tracking-[0.25em] text-right">Subtotal</th>
                         <th className="px-10 py-7"></th>
                       </tr>
@@ -614,74 +515,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </div>
               </div>
 
-              {/* Resumen de Pagos y Totales en la App */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                <div className="lg:col-span-7 space-y-8">
-                    <div className="flex justify-between items-center border-b-2 border-slate-100 pb-6">
-                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-                          <History size={24} className="text-emerald-500" /> Relación de Pagos Parciales
-                      </h3>
-                      <button onClick={() => setShowAbonoModal(true)} className="px-8 py-3 bg-emerald-600 text-white rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl shadow-emerald-50 transition-all active:scale-95">
-                          + Registrar Abono
-                      </button>
-                    </div>
-                    <div className="space-y-5 max-h-[400px] overflow-y-auto custom-scrollbar pr-4">
-                      {currentRepair.installments?.map((inst, idx) => (
-                        <div key={inst.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 flex justify-between items-center shadow-sm group hover:border-emerald-500 transition-all">
-                           <div className="flex items-center gap-6">
-                              <div className="w-14 h-14 bg-slate-950 text-white rounded-2xl flex items-center justify-center font-black group-hover:bg-emerald-600 transition-colors shadow-lg">
-                                 {idx + 1}
-                              </div>
-                              <div>
-                                 <p className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-3 mb-1">
-                                    <CalendarDays size={14} className="text-blue-500" /> {new Date(inst.date).toLocaleDateString()}
-                                 </p>
-                                 <p className="text-[11px] font-bold text-slate-400 uppercase">Método: <span className="text-slate-800 font-black">{inst.method}</span></p>
-                              </div>
-                           </div>
-                           <div className="flex items-center gap-6">
-                              <p className="text-3xl font-black text-emerald-600 tracking-tighter leading-none">+ ${Number(inst.amount).toFixed(2)}</p>
-                              <button 
-                                onClick={() => { setSelectedInstallment(inst); setShowReceiptModal(true); }}
-                                className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
-                                title="Ticket"
-                              >
-                                <Ticket size={22} />
-                              </button>
-                           </div>
-                        </div>
-                      ))}
-                    </div>
-                </div>
-
-                <div className="lg:col-span-5">
-                    <div className="bg-slate-950 rounded-[4rem] p-12 text-white shadow-2xl relative overflow-hidden border-[10px] border-slate-900">
-                      <DollarSign className="absolute -bottom-16 -right-16 text-white/5" size={320} />
-                      <div className="relative z-10 space-y-12">
-                        <div>
-                          <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4">Monto Bruto Orden</p>
-                          <h3 className="text-7xl font-black tracking-tighter leading-none">${calculateTotal().toFixed(2)}</h3>
-                        </div>
-                        <div className="space-y-6 pt-10 border-t border-white/10">
-                          <div className="flex justify-between items-center text-emerald-500">
-                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">Total Recibido</span>
-                            <span className="text-3xl font-black tracking-tighter">${calculatePaid().toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between items-center pt-10 border-t-2 border-white/20">
-                            <span className="text-xs font-black text-blue-500 uppercase tracking-[0.5em]">Saldo Neto</span>
-                            <span className={`text-7xl font-black tracking-tighter leading-none ${calculateBalance() > 0 ? 'text-blue-500' : 'text-emerald-500'}`}>
-                              ${calculateBalance().toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                </div>
-              </div>
-
+              {/* Botones de Acción de Impresión */}
               <div className="flex flex-wrap gap-6 pt-12 border-t-2 border-slate-100 no-print">
                 <button onClick={() => window.print()} className="flex-1 bg-white border-4 border-slate-950 py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] flex items-center justify-center gap-5 hover:bg-slate-50 shadow-2xl transition-all active:scale-[0.98]">
-                  <Printer size={30}/> Generar Informe Técnico PDF
+                  <Printer size={30}/> Imprimir Reporte Técnico PDF
                 </button>
                 {currentRepair.status !== 'Entregado' && (
                   <button onClick={() => setShowPayModal(true)} className="flex-1 bg-blue-600 text-white py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] flex items-center justify-center gap-5 hover:bg-blue-700 shadow-2xl transition-all active:scale-[0.98]">
@@ -696,30 +533,27 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             <div className="p-20 bg-slate-50 rounded-full mb-12 shadow-inner group">
               <ClipboardList size={140} className="text-slate-200 group-hover:scale-110 transition-transform duration-500" />
             </div>
-            <h4 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Buscador de Informes</h4>
+            <h4 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Buscador de Reportes</h4>
             <p className="mt-6 text-slate-500 text-center font-bold max-w-md px-12 leading-relaxed text-lg italic">
-              "Ingrese la placa para gestionar los cargos, pagos y emitir el reporte técnico profesional para el cliente."
+              "Ingrese la placa del vehículo para gestionar los cargos, pagos y emitir el informe técnico refinado."
             </p>
           </div>
         )}
       </div>
 
-      {/* MODALES REUTILIZADOS (SOA, Inventory, Abono, Pay) - SIN CAMBIOS EN LÓGICA PERO CON REFINAMIENTO VISUAL */}
-      {/* ... (Se mantienen según RepairReport.tsx previo pero con las mejoras ya aplicadas arriba) ... */}
-      
-      {/* MODAL: BÚSQUEDA DE INVENTARIO (Refinado para verse como el screenshot) */}
+      {/* MODALES EXISTENTES PARA ABONO, INVENTARIO, ETC. */}
       {showInventorySearch && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[4rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border-8 border-slate-100">
             <div className="p-12 border-b-4 border-slate-50 bg-slate-50/50">
               <div className="flex justify-between items-center mb-10">
                 <div>
-                  <h3 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none">Repuestos en Almacén</h3>
+                  <h3 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none">Repuestos Disponibles</h3>
                   <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.4em] mt-4 flex items-center gap-3">
-                    <Package size={18} /> Disponibilidad en tiempo real
+                    <Package size={18} /> Inventario en tiempo real
                   </p>
                 </div>
-                <button onClick={() => setShowInventorySearch(false)} className="w-16 h-16 bg-white border-4 border-slate-100 rounded-3xl text-slate-300 hover:text-red-500 hover:border-red-100 transition-all shadow-sm flex items-center justify-center">
+                <button onClick={() => setShowInventorySearch(false)} className="w-16 h-16 bg-white border-4 border-slate-100 rounded-3xl text-slate-300 hover:text-red-500 transition-all flex items-center justify-center">
                   <X size={32} />
                 </button>
               </div>
@@ -727,7 +561,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400" size={30}/>
                 <input 
                   type="text" 
-                  placeholder="Busque por nombre o código de barra..." 
+                  placeholder="Buscar repuesto por nombre o código..." 
                   className="w-full pl-20 pr-10 py-6 bg-white border-4 border-slate-200 rounded-[2.5rem] outline-none focus:ring-8 focus:ring-blue-50 font-black text-xl transition-all shadow-inner"
                   value={invSearchTerm}
                   onChange={(e) => setInvSearchTerm(e.target.value)}
@@ -763,7 +597,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* MODAL: COBRAR ABONO */}
       {showAbonoModal && (
         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[5rem] shadow-2xl max-w-md w-full p-16 animate-in zoom-in duration-300 border-8 border-slate-100 text-center">
@@ -799,6 +632,136 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
+      {showSOAModal && currentRepair && (
+        <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-center justify-center z-[110] p-4 no-print overflow-y-auto">
+          <div className="bg-white rounded-[4rem] shadow-2xl max-w-5xl w-full flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in duration-300 border-8 border-slate-100">
+            <div className="p-12 bg-emerald-700 text-white flex justify-between items-center relative overflow-hidden shrink-0">
+               <div className="absolute top-0 right-0 p-12 opacity-10 rotate-45">
+                  <FileText size={220} />
+               </div>
+               <div className="relative z-10">
+                  <h3 className="text-5xl font-black uppercase tracking-tighter leading-none">Historial Financiero</h3>
+                  <p className="text-emerald-100 text-[11px] font-black uppercase tracking-[0.4em] mt-4 opacity-80 italic">Balance de Transacciones - Orden #{currentRepair.id.toUpperCase()}</p>
+               </div>
+               <button onClick={() => setShowSOAModal(false)} className="w-16 h-16 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-3xl transition-all relative z-10 text-white border-2 border-white/20 group">
+                 <X size={32} className="group-hover:rotate-90 transition-transform duration-500" />
+               </button>
+            </div>
+
+            <div className="p-12 overflow-y-auto custom-scrollbar flex-1 space-y-12 bg-slate-50/50">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="bg-white p-8 rounded-[3rem] border-2 border-slate-200 shadow-sm">
+                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Acumulado ($)</p>
+                     <p className="text-4xl font-black text-slate-900 tracking-tighter">${calculateTotal().toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white p-8 rounded-[3rem] border-2 border-slate-200 shadow-sm">
+                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Abonado ($)</p>
+                     <p className="text-4xl font-black text-emerald-600 tracking-tighter">${calculatePaid().toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white p-8 rounded-[3rem] border-4 border-emerald-600 shadow-2xl shadow-emerald-900/10">
+                     <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest mb-3">Saldo Por Cobrar</p>
+                     <p className="text-4xl font-black text-slate-900 tracking-tighter">${calculateBalance().toFixed(2)}</p>
+                  </div>
+               </div>
+
+               <div className="bg-white rounded-[3.5rem] border-4 border-slate-100 shadow-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 text-white border-b-4 border-slate-950">
+                        <th className="px-10 py-6 text-[11px] font-black uppercase tracking-widest">Fecha</th>
+                        <th className="px-10 py-6 text-[11px] font-black uppercase tracking-widest">Descripción / Referencia</th>
+                        <th className="px-10 py-6 text-[11px] font-black uppercase tracking-widest text-right">Cargo (+)</th>
+                        <th className="px-10 py-6 text-[11px] font-black uppercase tracking-widest text-right">Crédito (-)</th>
+                        <th className="px-10 py-6 text-[11px] font-black uppercase tracking-widest text-right">Balance USD</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="bg-slate-50/50">
+                         <td className="px-10 py-6 text-xs font-bold text-slate-500">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
+                         <td className="px-10 py-6 text-xs font-black text-slate-800 uppercase tracking-tight">Cargo Inicial por Orden de Servicio</td>
+                         <td className="px-10 py-6 text-right font-black text-slate-950 text-base">${calculateTotal().toFixed(2)}</td>
+                         <td className="px-10 py-6 text-right">-</td>
+                         <td className="px-10 py-6 text-right font-black text-slate-950 text-xl tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                      </tr>
+                      {currentRepair.installments?.map((inst, idx) => {
+                        const runningBal = calculateTotal() - currentRepair.installments!.slice(0, idx + 1).reduce((acc, i) => acc + i.amount, 0);
+                        return (
+                          <tr key={inst.id} className="hover:bg-slate-50 transition-colors group">
+                             <td className="px-10 py-6 text-xs font-bold text-slate-500">{new Date(inst.date).toLocaleDateString()}</td>
+                             <td className="px-10 py-6 text-xs font-black text-slate-800 uppercase tracking-tight">Abono Registrado ({inst.method})</td>
+                             <td className="px-10 py-6 text-right">-</td>
+                             <td className="px-10 py-6 text-right">
+                                <span className="flex items-center justify-end gap-2 text-emerald-600 font-black">
+                                  <ArrowDownCircle size={14} className="text-emerald-500" /> ${inst.amount.toFixed(2)}
+                                </span>
+                             </td>
+                             <td className="px-10 py-6 text-right font-black text-slate-950 text-xl tracking-tighter">
+                                ${runningBal.toFixed(2)}
+                             </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+               </div>
+            </div>
+
+            <div className="p-10 border-t-4 border-slate-100 bg-white flex justify-between items-center shrink-0">
+               <div className="flex flex-col">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pendiente en Bs (Ref)</span>
+                  <span className="text-3xl font-black text-emerald-700 tracking-tighter leading-none">{(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</span>
+               </div>
+               <div className="flex gap-6">
+                  <button 
+                    onClick={() => window.print()}
+                    className="bg-slate-950 text-white px-10 py-5 rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest hover:bg-black transition-all shadow-2xl flex items-center gap-3"
+                  >
+                    <Printer size={22}/> Imprimir Estado de Cuenta
+                  </button>
+                  <button 
+                    onClick={() => setShowSOAModal(false)}
+                    className="bg-slate-100 text-slate-500 px-10 py-5 rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest hover:bg-slate-200 transition-all border-2 border-slate-200"
+                  >
+                    Cerrar
+                  </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPayModal && (
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[5rem] shadow-2xl max-w-xl w-full p-16 text-center border-8 border-slate-100 animate-in zoom-in duration-300">
+            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-10 shadow-inner">
+               <CheckCircle size={60} />
+            </div>
+            <h3 className="text-5xl font-black mb-6 text-slate-950 uppercase tracking-tighter leading-none">Cerrar Orden</h3>
+            <p className="text-slate-500 mb-12 font-bold text-lg leading-relaxed">
+              Está a punto de cerrar la orden y entregar el vehículo. Se liquidará el saldo pendiente de:
+              <span className="text-emerald-600 font-black text-5xl tracking-tighter block mt-4 animate-pulse">${calculateBalance().toFixed(2)}</span>
+            </p>
+            <div className="space-y-4">
+               <div className="flex flex-col items-center mb-10">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Vía de pago final:</p>
+                  <select 
+                    className="w-full px-10 py-5 bg-slate-50 border-4 border-slate-100 rounded-[2.5rem] font-black uppercase text-xs outline-none text-center appearance-none cursor-pointer"
+                    value={tempPaymentMethod}
+                    onChange={(e) => setTempPaymentMethod(e.target.value as PaymentMethod)}
+                  >
+                    {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+               </div>
+               <button onClick={finalizeRepair} className="w-full py-8 bg-slate-950 text-white rounded-[3rem] font-black uppercase text-sm tracking-[0.4em] hover:bg-black shadow-2xl transition-all active:scale-95">
+                 Liquidar y Generar PDF Final
+               </button>
+               <button onClick={() => setShowPayModal(false)} className="w-full py-4 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:text-red-500 transition-colors">Volver</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
