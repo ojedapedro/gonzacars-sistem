@@ -11,15 +11,13 @@ import {
   Minus, 
   ClipboardList, 
   DollarSign, 
-  History, 
   X,
   FileText,
   Layers,
   Fuel,
-  Ticket,
-  CalendarDays,
   ArrowDownCircle,
-  Receipt
+  Receipt,
+  History
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -200,14 +198,14 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       paymentMethod: tempPaymentMethod
     });
 
-    // Acción de imprimir el reporte final
+    // Acción de imprimir antes de limpiar
     setTimeout(() => {
       window.print();
       // Limpiar y liberar la vista para el siguiente vehículo
       setCurrentRepair(null);
       setSearchPlate('');
       setShowPayModal(false);
-      alert('Orden finalizada, entregada y pantalla liberada.');
+      alert('Orden finalizada con éxito. Vista liberada.');
     }, 500);
   };
 
@@ -235,7 +233,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       {/* SECCIÓN DE IMPRESIÓN DE INFORME (ESTILO PDF ÚLTIMA REFERENCIA) */}
       {currentRepair && (
         <div className="hidden print:block print-only p-12 bg-white text-slate-950 font-sans min-h-screen">
-          {/* Header Superior Minimalista */}
           <div className="flex justify-between items-start mb-14">
             <div className="flex gap-10 items-center">
               <img src={LOGO_URL} alt="Logo" className="w-24 h-24 object-contain grayscale" />
@@ -254,16 +251,15 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
           </div>
 
-          {/* Bloques de Datos Cliente / Vehículo */}
           <div className="grid grid-cols-2 gap-12 mb-14">
-            <div className="border-[2px] border-slate-100 p-8 relative">
+            <div className="border border-slate-100 p-8 relative">
               <h3 className="absolute -top-3 left-6 bg-white px-4 font-black text-slate-400 uppercase tracking-widest text-[9px]">TITULAR DE LA CUENTA</h3>
               <div className="space-y-1">
                 <p className="font-black text-2xl text-slate-900 uppercase leading-none">{currentRepair.ownerName}</p>
-                <p className="text-xs font-bold text-slate-400 mt-2">ID: {currentRepair.customerId}</p>
+                <p className="text-xs font-bold text-slate-400 mt-2 tracking-widest">ID: {currentRepair.customerId}</p>
               </div>
             </div>
-            <div className="border-[2px] border-slate-100 p-8 relative">
+            <div className="border border-slate-100 p-8 relative">
               <h3 className="absolute -top-3 left-6 bg-white px-4 font-black text-slate-400 uppercase tracking-widest text-[9px]">DETALLE VEHÍCULO</h3>
               <div className="space-y-1">
                 <p className="font-black text-2xl text-slate-900 uppercase leading-none">{currentRepair.brand} {currentRepair.model}</p>
@@ -272,7 +268,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
           </div>
 
-          {/* Diagnóstico con barra de acento */}
           <div className="mb-14">
              <div className="flex items-center gap-3 mb-6">
                 <div className="bg-blue-600 p-1.5 rounded-lg text-white">
@@ -285,7 +280,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
              </div>
           </div>
 
-          {/* Tabla Desglosada: Repuestos, Consumibles, Mano de Obra y Abonos */}
           <div className="mb-14">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -298,7 +292,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {/* Ítems de la Reparación */}
                 {currentRepair.items.map((item, idx) => (
                   <tr key={idx}>
                     <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(currentRepair.createdAt).toLocaleDateString()}</td>
@@ -312,9 +305,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   </tr>
                 ))}
                 
-                {/* Abonos Realizados */}
                 {currentRepair.installments?.map((inst, idx) => (
-                  <tr key={`inst-${idx}`} className="bg-slate-50/20">
+                  <tr key={`inst-${idx}`} className="bg-emerald-50/20">
                     <td className="py-8 px-4 text-xs font-bold text-slate-400">{new Date(inst.date).toLocaleDateString()}</td>
                     <td className="py-8 px-4">
                       <p className="font-black text-emerald-700 uppercase text-sm leading-tight">ABONO RECIBIDO ({inst.method})</p>
@@ -328,7 +320,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </table>
           </div>
 
-          {/* Caja de Total Final Refinada */}
           <div className="flex justify-end mb-24">
              <div className="w-[420px] border-[4px] border-slate-950 p-10 text-right relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-slate-950 rotate-45 translate-x-12 -translate-y-12"></div>
@@ -342,53 +333,18 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
              </div>
           </div>
 
-          {/* Firmas de Autoridad */}
           <div className="grid grid-cols-2 gap-32 px-10 text-center font-black uppercase text-[10px] tracking-[0.3em] mt-auto">
-            <div className="border-t-[2px] border-slate-950 pt-6">
+            <div className="border-t-[2px] border-slate-950 pt-8">
               FIRMA AUTORIZADA
             </div>
-            <div className="border-t-[2px] border-slate-950 pt-6">
+            <div className="border-t-[2px] border-slate-950 pt-8">
               CONFORMIDAD CLIENTE
             </div>
           </div>
 
           <div className="mt-32 pt-10 border-t border-slate-100 flex justify-between items-center opacity-40">
              <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest">https://gonzacars-sistem.vercel.app</div>
-             <div className="text-[9px] font-black uppercase text-slate-500">Documento Generado el {new Date().toLocaleDateString()}</div>
-          </div>
-        </div>
-      )}
-
-      {/* COMPROBANTE DE ABONO (PRINT ONLY) */}
-      {lastInstallment && currentRepair && (
-        <div className="hidden print:block print-only bg-white text-slate-900 w-full p-8" style={{ maxWidth: '80mm' }}>
-           <div className="text-center mb-6">
-            <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain grayscale" />
-            <h2 className="text-lg font-black uppercase tracking-tighter">Gonzacars C.A.</h2>
-            <p className="text-[10px] font-black tracking-widest">RECIBO DE ABONO</p>
-          </div>
-          <div className="border-y border-dashed border-slate-900 py-3 mb-4 text-[10px]">
-             <p><b>Fecha:</b> {new Date(lastInstallment.date).toLocaleString()}</p>
-             <p><b>Orden:</b> #{currentRepair.id.toUpperCase().slice(-8)}</p>
-             <p><b>Cliente:</b> {currentRepair.ownerName}</p>
-             <p><b>Vehículo:</b> {currentRepair.brand} {currentRepair.model}</p>
-          </div>
-          <div className="space-y-2 mb-6">
-             <div className="flex justify-between font-black text-sm">
-                <span>MONTO ABONADO:</span>
-                <span>${lastInstallment.amount.toFixed(2)}</span>
-             </div>
-             <div className="flex justify-between text-[10px]">
-                <span>Método:</span>
-                <span className="uppercase">{lastInstallment.method}</span>
-             </div>
-             <div className="flex justify-between text-[10px] pt-2 border-t border-slate-100">
-                <span>SALDO RESTANTE:</span>
-                <span className="font-black">${calculateBalance().toFixed(2)}</span>
-             </div>
-          </div>
-          <div className="text-center text-[9px] font-bold uppercase border-t border-dashed border-slate-900 pt-4">
-             ¡Gracias por su pago!
+             <div className="text-[9px] font-black uppercase text-slate-500">Documento de Validez Técnica y Financiera</div>
           </div>
         </div>
       )}
@@ -474,7 +430,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 <p className="text-slate-700 italic leading-relaxed font-semibold text-xl pt-4">"{currentRepair.diagnosis || 'Pendiente por diagnóstico.'}"</p>
               </div>
 
-              {/* Detalle de Cargos */}
               <div className="space-y-8">
                 <div className="flex justify-between items-center px-4">
                   <h3 className="text-3xl font-black text-slate-950 uppercase tracking-tighter flex items-center gap-4">
@@ -523,9 +478,9 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                           </td>
                           <td className="px-10 py-7">
                             <div className="flex items-center justify-center gap-4">
-                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Minus size={12}/></button>
+                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="w-9 h-9 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Minus size={12}/></button>
                               <span className="font-black text-slate-900 text-lg min-w-[30px] text-center">{item.quantity}</span>
-                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Plus size={12}/></button>
+                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="w-9 h-9 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl text-slate-300 hover:text-blue-600 hover:border-blue-500 shadow-sm transition-all"><Plus size={12}/></button>
                             </div>
                           </td>
                           <td className="px-10 py-7 text-right">
@@ -554,7 +509,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 </div>
               </div>
 
-              {/* Botones de Acción */}
               <div className="flex flex-wrap gap-6 pt-12 border-t-2 border-slate-100 no-print">
                 <button onClick={() => window.print()} className="flex-1 bg-white border-4 border-slate-950 py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] flex items-center justify-center gap-5 hover:bg-slate-50 shadow-2xl transition-all active:scale-[0.98]">
                   <Printer size={30}/> Imprimir Informe Técnico PDF
