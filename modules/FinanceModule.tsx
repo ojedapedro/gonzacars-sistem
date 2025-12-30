@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw, Wrench, ShoppingBag } from 'lucide-react';
 import { generateFinanceAudit } from '../lib/gemini';
+import { VehicleRepair, Installment } from '../types';
 
 const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
   const [viewMode, setViewMode] = useState<'general' | 'daily'>('daily');
@@ -10,6 +11,29 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
+  // 1. Calcular Ingresos del Taller (Base: Flujo de Caja / Abonos recibidos)
+  const workshopIncome = useMemo(() => {
+    const repairs: VehicleRepair[] = Array.isArray(store.repairs) ? store.repairs : [];
+    
+    if (viewMode === 'general') {
+      // Suma de todos los abonos históricos
+      return repairs.reduce((acc, repair) => {
+        const totalPaid = (repair.installments || []).reduce((sum, inst) => sum + Number(inst.amount), 0);
+        return acc + totalPaid;
+      }, 0);
+    } else {
+      // Suma solo los abonos realizados en la fecha seleccionada
+      return repairs.reduce((acc, repair) => {
+        const dailyPaid = (repair.installments || []).filter((inst: Installment) => {
+          // Extraer YYYY-MM-DD del ISO string del abono
+          return inst.date.split('T')[0] === filterDate;
+        }).reduce((sum, inst) => sum + Number(inst.amount), 0);
+        return acc + dailyPaid;
+      }, 0);
+    }
+  }, [store.repairs, viewMode, filterDate]);
+
+  // 2. Calcular Ingresos del POS y Gastos
   const filteredData = useMemo(() => {
     const sBase = Array.isArray(store.sales) ? store.sales : [];
     const pBase = Array.isArray(store.purchases) ? store.purchases : [];
@@ -26,16 +50,19 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
     }
   }, [store.sales, store.purchases, store.expenses, viewMode, filterDate]);
 
-  const totalSales = filteredData.sales.reduce((acc: number, s: any) => acc + Number(s.total || 0), 0);
+  const posSales = filteredData.sales.reduce((acc: number, s: any) => acc + Number(s.total || 0), 0);
   const totalPurchases = filteredData.purchases.reduce((acc: number, p: any) => acc + Number(p.total || 0), 0);
   const totalExpenses = filteredData.expenses.reduce((acc: number, e: any) => acc + Number(e.amount || 0), 0);
-  const balance = totalSales - (totalPurchases + totalExpenses);
+  
+  // 3. Totales Consolidados
+  const totalRevenue = posSales + workshopIncome;
+  const balance = totalRevenue - (totalPurchases + totalExpenses);
 
   const handleAiAudit = async () => {
     setIsAiLoading(true);
     try {
       const analysis = await generateFinanceAudit({
-        sales: totalSales,
+        sales: totalRevenue, // Enviamos el total consolidado a la IA
         purchases: totalPurchases,
         expenses: totalExpenses,
         balance: balance,
@@ -50,9 +77,10 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
   };
 
   const chartData = [
-    { name: 'Ventas', value: totalSales, fill: '#3b82f6' },
+    { name: 'Ventas POS', value: posSales, fill: '#3b82f6' },
+    { name: 'Ingresos Taller', value: workshopIncome, fill: '#8b5cf6' },
     { name: 'Compras', value: totalPurchases, fill: '#ef4444' },
-    { name: 'Gastos', value: totalExpenses, fill: '#f59e0b' }
+    { name: 'Gastos Op.', value: totalExpenses, fill: '#f59e0b' }
   ];
 
   const categoryData: { name: string; value: number }[] = Object.values(
@@ -73,7 +101,7 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div>
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Análisis Financiero</h3>
-          <p className="text-slate-500 font-medium mt-2">Rentabilidad y flujo de caja en tiempo real</p>
+          <p className="text-slate-500 font-medium mt-2">Rentabilidad consolidada (Taller + Tienda) en tiempo real</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-[2rem] border border-slate-200 shadow-sm">
@@ -91,9 +119,9 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Ventas" amount={totalSales} icon={<ArrowUpCircle className="text-emerald-500"/>} rate={store.exchangeRate}/>
-        <StatCard title="Compras" amount={totalPurchases} icon={<ArrowDownCircle className="text-red-500"/>} rate={store.exchangeRate}/>
-        <StatCard title="Gastos" amount={totalExpenses} icon={<ArrowDownCircle className="text-orange-500"/>} rate={store.exchangeRate}/>
+        <StatCard title="Ingresos Totales" amount={totalRevenue} icon={<ArrowUpCircle className="text-emerald-500"/>} rate={store.exchangeRate} />
+        <StatCard title="Compras Stock" amount={totalPurchases} icon={<ArrowDownCircle className="text-red-500"/>} rate={store.exchangeRate}/>
+        <StatCard title="Gastos Operativos" amount={totalExpenses} icon={<ArrowDownCircle className="text-orange-500"/>} rate={store.exchangeRate}/>
         <StatCard title="Balance Neto" amount={balance} icon={<DollarSign className="text-blue-500"/>} rate={store.exchangeRate} isBalance/>
       </div>
 
@@ -106,22 +134,28 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
+          <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Flujo de Caja por Fuente</h4>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <BarChart data={chartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} />
               <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-              <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}} />
-              <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={40} />
+              <Tooltip 
+                cursor={{fill: '#f8fafc'}} 
+                contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold'}} 
+                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Monto']}
+              />
+              <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={50} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
+          <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Desglose de Gastos</h4>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+              <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={5} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                 {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>
               <Tooltip />

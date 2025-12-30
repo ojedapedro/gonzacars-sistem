@@ -15,7 +15,8 @@ import {
   FileText,
   Layers,
   ArrowDownCircle,
-  Receipt
+  Receipt,
+  PenTool
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -29,6 +30,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [showInventorySearch, setShowInventorySearch] = useState(false);
   const [invSearchTerm, setInvSearchTerm] = useState('');
   
+  // Estado para servicio manual
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [newService, setNewService] = useState({ description: '', price: 0, quantity: 1 });
+
   const [tempPaymentMethod, setTempPaymentMethod] = useState<PaymentMethod>('Efectivo $');
   const [abonoAmount, setAbonoAmount] = useState<number>(0);
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
@@ -67,18 +72,25 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     store.updateRepair(updated);
   };
 
-  const addItemManually = (type: RepairItem['type']) => {
-    if (!currentRepair) return;
+  const saveManualService = () => {
+    if (!currentRepair || !newService.description) {
+        alert("La descripción es obligatoria");
+        return;
+    }
     const newItem: RepairItem = {
       id: Math.random().toString(36).substr(2, 9),
-      type,
-      description: type === 'Servicio' ? 'Mano de obra' : '',
-      quantity: 1,
-      price: 0
+      type: 'Servicio',
+      description: newService.description,
+      quantity: newService.quantity,
+      price: newService.price
     };
     const updated = { ...currentRepair, items: [...currentRepair.items, newItem] };
     setCurrentRepair(updated);
     store.updateRepair(updated);
+    
+    // Resetear y cerrar modal
+    setNewService({ description: '', price: 0, quantity: 1 });
+    setShowServiceModal(false);
   };
 
   const addFromInventory = (product: Product) => {
@@ -429,8 +441,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                     <button onClick={() => setShowInventorySearch(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700">
                       + Repuesto
                     </button>
-                    <button onClick={() => addItemManually('Servicio')} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black">
-                      + Servicio
+                    <button onClick={() => setShowServiceModal(true)} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black">
+                      + Servicio Manual
                     </button>
                   </div>
                 </div>
@@ -502,6 +514,68 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           </div>
         )}
       </div>
+
+      {/* MODAL SERVICIO MANUAL */}
+      {showServiceModal && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 print:hidden">
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-lg w-full p-10 animate-in zoom-in duration-300 border border-slate-100">
+            <div className="text-center mb-8">
+               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-blue-600">
+                  <PenTool size={32} />
+               </div>
+               <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Agregar Servicio Manual</h3>
+               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Detalles del cargo personalizado</p>
+            </div>
+            
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción del Servicio</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: Mano de Obra, Revisión Eléctrica..."
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-bold transition-all uppercase"
+                    value={newService.description}
+                    onChange={(e) => setNewService({...newService, description: e.target.value})}
+                    autoFocus
+                  />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Costo Unitario ($)</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-black text-lg transition-all"
+                        value={newService.price || ''}
+                        onChange={(e) => setNewService({...newService, price: Number(e.target.value)})}
+                      />
+                  </div>
+                  <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cantidad</label>
+                      <input 
+                        type="number" 
+                        placeholder="1"
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 font-black text-lg transition-all text-center"
+                        value={newService.quantity}
+                        onChange={(e) => setNewService({...newService, quantity: Number(e.target.value)})}
+                      />
+                  </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setShowServiceModal(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors">
+                   Cancelar
+                </button>
+                <button onClick={saveManualService} className="flex-[1.5] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all">
+                   Agregar Item
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL ABONO */}
       {showAbonoModal && (
