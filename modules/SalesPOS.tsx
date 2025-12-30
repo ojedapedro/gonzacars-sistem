@@ -159,13 +159,15 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
     };
   };
 
+  const dailyStats = showDailyReport ? getDailyTotals() : null;
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
     <div className="flex h-full relative">
-      <div className="flex flex-1 h-full no-print">
+      <div className="flex flex-1 h-full print:hidden">
         <div className="flex-1 p-8 border-r border-slate-200 overflow-y-auto custom-scrollbar bg-slate-50/30">
           <div className="mb-6 flex gap-4">
             <div className="relative flex-1">
@@ -350,8 +352,8 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
         </div>
       </div>
 
-      {/* Ticket Invisible para Impresión (Factura) */}
-      {lastSale && (
+      {/* Ticket Invisible para Impresión (Factura de Venta) */}
+      {showReceiptModal && lastSale && !showDailyReport && (
         <div className="print-only p-8 bg-white text-slate-900 w-full" style={{ maxWidth: '80mm' }}>
           <div className="text-center mb-6">
             <img src={LOGO_URL} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain" />
@@ -425,9 +427,92 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* Modal de Reporte Diario (Arqueo) */}
-      {showDailyReport && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 no-print">
+      {/* VISTA DE IMPRESIÓN DEL REPORTE DIARIO (Visible solo al imprimir) */}
+      {dailyStats && (
+        <div className="hidden print:block print-only bg-white text-slate-900 p-8 w-full max-w-[216mm] mx-auto min-h-screen">
+          <div className="text-center border-b-2 border-slate-900 pb-6 mb-8">
+            <h1 className="text-2xl font-black uppercase tracking-tight mb-2">Reporte de Cierre de Caja</h1>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Gonzacars C.A. | RIF: J-50030426-9</p>
+            <p className="text-sm font-bold mt-2">FECHA: {new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="border border-slate-200 p-4 rounded-xl">
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ventas Totales (USD)</p>
+               <p className="text-4xl font-black text-slate-900">${dailyStats.totalUSD.toFixed(2)}</p>
+            </div>
+            <div className="border border-slate-200 p-4 rounded-xl">
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ventas Totales (Bs)</p>
+               <p className="text-4xl font-black text-slate-900">{dailyStats.totalBS.toLocaleString('es-VE')} Bs</p>
+            </div>
+            <div className="border border-slate-200 p-4 rounded-xl">
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Transacciones</p>
+               <p className="text-2xl font-black text-slate-900">{dailyStats.count} Operaciones</p>
+            </div>
+            <div className="border border-slate-200 p-4 rounded-xl">
+               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ticket Promedio</p>
+               <p className="text-2xl font-black text-slate-900">${dailyStats.ticketPromedio.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h4 className="text-xs font-black uppercase tracking-widest border-b border-slate-300 pb-2 mb-4">Desglose por Método de Pago</h4>
+            <table className="w-full text-xs">
+               <thead>
+                 <tr className="bg-slate-100">
+                    <th className="text-left py-2 px-2">Método</th>
+                    <th className="text-right py-2 px-2">Total ($)</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                  {Object.entries(dailyStats.totalsByMethod).map(([method, amount]: [string, any]) => (
+                    <tr key={method}>
+                       <td className="py-2 px-2 font-bold uppercase">{method}</td>
+                       <td className="py-2 px-2 text-right font-black">${Number(amount).toFixed(2)}</td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
+          </div>
+
+          <div className="mb-8">
+             <h4 className="text-xs font-black uppercase tracking-widest border-b border-slate-300 pb-2 mb-4">Productos Más Vendidos</h4>
+             <table className="w-full text-xs">
+               <thead>
+                 <tr className="bg-slate-100">
+                    <th className="text-left py-2 px-2">Producto</th>
+                    <th className="text-center py-2 px-2">Cant.</th>
+                    <th className="text-right py-2 px-2">Total ($)</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                  {dailyStats.topItemsByValue.map((item: any, idx: number) => (
+                    <tr key={idx}>
+                       <td className="py-2 px-2 font-bold uppercase">{item.name}</td>
+                       <td className="py-2 px-2 text-center">{item.qty}</td>
+                       <td className="py-2 px-2 text-right font-black">${item.val.toFixed(2)}</td>
+                    </tr>
+                  ))}
+               </tbody>
+             </table>
+          </div>
+
+          <div className="mt-12 pt-8 border-t-2 border-slate-900 flex justify-between px-10">
+             <div className="text-center">
+                <div className="w-40 border-t border-slate-400 mb-2"></div>
+                <p className="text-[10px] font-black uppercase tracking-widest">Firma Cajero</p>
+             </div>
+             <div className="text-center">
+                <div className="w-40 border-t border-slate-400 mb-2"></div>
+                <p className="text-[10px] font-black uppercase tracking-widest">Firma Supervisor</p>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reporte Diario UI (Arqueo en Pantalla) - OCULTO AL IMPRIMIR */}
+      {showDailyReport && dailyStats && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 print:hidden">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-8 duration-500 border border-slate-200">
             <div className="p-10 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-5">
@@ -452,136 +537,131 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
             </div>
 
             <div className="p-10 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
-              {(() => {
-                const report = getDailyTotals();
-                return (
-                  <div className="space-y-12">
-                    {/* Tarjetas Principales */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative group">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ingreso Bruto (USD)</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-slate-900 tracking-tighter">${report.totalUSD.toFixed(2)}</span>
-                          <ArrowUpRight size={20} className="text-emerald-500" />
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase">En Bolívares</p>
-                          <p className="text-xl font-black text-emerald-700 tracking-tight">{report.totalBS.toLocaleString('es-VE')} Bs</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ticket Promedio</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-blue-600 tracking-tighter">${report.ticketPromedio.toFixed(2)}</span>
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase">Volumen Diario</p>
-                          <p className="text-xl font-black text-slate-900">{report.count} Ventas</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Artículos Vendidos</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-purple-600 tracking-tighter">{report.itemsSold}</span>
-                          <Tag size={20} className="text-purple-200" />
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase">Total Unidades</p>
-                          <p className="text-xl font-black text-slate-900">Salida de Stock</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                        <DollarSign className="absolute -bottom-4 -right-4 text-white/5" size={140} />
-                        <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tasa Ref.</p>
-                          <p className="text-2xl font-black tracking-tight text-blue-400">{store.exchangeRate.toFixed(2)} Bs/$</p>
-                        </div>
-                      </div>
+              <div className="space-y-12">
+                {/* Tarjetas Principales */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative group">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ingreso Bruto (USD)</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-slate-900 tracking-tighter">${dailyStats.totalUSD.toFixed(2)}</span>
+                      <ArrowUpRight size={20} className="text-emerald-500" />
                     </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                      {/* Desglose por Método */}
-                      <div className="lg:col-span-12 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <Wallet size={18} className="text-blue-500" /> Desglose por Método de Pago
-                          </h4>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                          {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map((method) => {
-                            const amount = Number(report.totalsByMethod[method] || 0);
-                            return (
-                              <div key={method} className="bg-white p-6 rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
-                                <span className="font-black text-slate-400 text-[9px] uppercase block mb-3">{method}</span>
-                                <p className="font-black text-slate-950 text-xl tracking-tighter">${amount.toFixed(2)}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Top Productos por Cantidad */}
-                      <div className="lg:col-span-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <TrendingUp size={18} className="text-blue-500" /> Top Vendidos (Cantidad)
-                          </h4>
-                        </div>
-                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
-                          {report.topItemsByQty.map((item: any, idx: number) => {
-                            const percentage = (item.qty / report.itemsSold) * 100;
-                            return (
-                              <div key={idx} className="space-y-2 group">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
-                                  <span className="font-black text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full whitespace-nowrap">{item.qty} unid.</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                   <div 
-                                    className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
-                                    style={{ width: `${percentage}%` }}
-                                   />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Top Productos por Valor */}
-                      <div className="lg:col-span-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <DollarSign size={18} className="text-emerald-500" /> Top Rendimiento (Valor)
-                          </h4>
-                        </div>
-                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
-                          {report.topItemsByValue.map((item: any, idx: number) => {
-                            const percentage = (item.val / report.totalUSD) * 100;
-                            return (
-                              <div key={idx} className="space-y-2 group">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
-                                  <span className="font-black text-emerald-600 text-xs bg-emerald-50 px-3 py-1 rounded-full whitespace-nowrap">${item.val.toFixed(2)}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                   <div 
-                                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
-                                    style={{ width: `${percentage}%` }}
-                                   />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase">En Bolívares</p>
+                      <p className="text-xl font-black text-emerald-700 tracking-tight">{dailyStats.totalBS.toLocaleString('es-VE')} Bs</p>
                     </div>
                   </div>
-                );
-              })()}
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ticket Promedio</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-blue-600 tracking-tighter">${dailyStats.ticketPromedio.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Volumen Diario</p>
+                      <p className="text-xl font-black text-slate-900">{dailyStats.count} Ventas</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Artículos Vendidos</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-purple-600 tracking-tighter">{dailyStats.itemsSold}</span>
+                      <Tag size={20} className="text-purple-200" />
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-50">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Total Unidades</p>
+                      <p className="text-xl font-black text-slate-900">Salida de Stock</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                    <DollarSign className="absolute -bottom-4 -right-4 text-white/5" size={140} />
+                    <div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tasa Ref.</p>
+                      <p className="text-2xl font-black tracking-tight text-blue-400">{store.exchangeRate.toFixed(2)} Bs/$</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                  {/* Desglose por Método */}
+                  <div className="lg:col-span-12 space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Wallet size={18} className="text-blue-500" /> Desglose por Método de Pago
+                      </h4>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map((method) => {
+                        const amount = Number(dailyStats.totalsByMethod[method] || 0);
+                        return (
+                          <div key={method} className="bg-white p-6 rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
+                            <span className="font-black text-slate-400 text-[9px] uppercase block mb-3">{method}</span>
+                            <p className="font-black text-slate-950 text-xl tracking-tighter">${amount.toFixed(2)}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Top Productos por Cantidad */}
+                  <div className="lg:col-span-6 space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <TrendingUp size={18} className="text-blue-500" /> Top Vendidos (Cantidad)
+                      </h4>
+                    </div>
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
+                      {dailyStats.topItemsByQty.map((item: any, idx: number) => {
+                        const percentage = (item.qty / dailyStats.itemsSold) * 100;
+                        return (
+                          <div key={idx} className="space-y-2 group">
+                            <div className="flex justify-between items-center">
+                              <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
+                              <span className="font-black text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full whitespace-nowrap">{item.qty} unid.</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                                style={{ width: `${percentage}%` }}
+                                />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Top Productos por Valor */}
+                  <div className="lg:col-span-6 space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <DollarSign size={18} className="text-emerald-500" /> Top Rendimiento (Valor)
+                      </h4>
+                    </div>
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
+                      {dailyStats.topItemsByValue.map((item: any, idx: number) => {
+                        const percentage = (item.val / dailyStats.totalUSD) * 100;
+                        return (
+                          <div key={idx} className="space-y-2 group">
+                            <div className="flex justify-between items-center">
+                              <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
+                              <span className="font-black text-emerald-600 text-xs bg-emerald-50 px-3 py-1 rounded-full whitespace-nowrap">${item.val.toFixed(2)}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
+                                style={{ width: `${percentage}%` }}
+                                />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="p-8 bg-white border-t border-slate-100 flex gap-4 no-print">
