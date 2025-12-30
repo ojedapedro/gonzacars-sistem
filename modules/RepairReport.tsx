@@ -147,17 +147,47 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
   const finalizeRepair = () => {
     if (!currentRepair) return;
+    
+    // 1. Calcular Saldo Restante para liquidar
+    const pendingBalance = calculateBalance();
+    
+    // 2. Crear lista de abonos actualizada (Agregando el pago final si existe deuda)
+    let updatedInstallments = [...(currentRepair.installments || [])];
+    
+    if (pendingBalance > 0.01) {
+      updatedInstallments.push({
+        id: `final-${Date.now()}`,
+        date: new Date().toISOString(),
+        amount: pendingBalance,
+        method: tempPaymentMethod // El método seleccionado en el modal
+      });
+    }
+
+    // 3. Crear objeto actualizado
     const updated: VehicleRepair = {
       ...currentRepair,
       status: 'Entregado',
       finishedAt: new Date().toISOString(),
-      paymentMethod: tempPaymentMethod
+      paymentMethod: tempPaymentMethod,
+      installments: updatedInstallments
     };
+
+    // 4. Guardar en Store y Actualizar Estado Local para que el PDF salga actualizado
     store.updateRepair(updated);
-    window.print();
-    setCurrentRepair(null);
-    setSearchPlate('');
-    setShowPayModal(false);
+    setCurrentRepair(updated);
+
+    // 5. Esperar un momento para que React renderice el estado actualizado y lanzar impresión
+    setTimeout(() => {
+      window.print();
+      
+      // 6. Limpiar todo después de imprimir
+      setTimeout(() => {
+        setCurrentRepair(null);
+        setSearchPlate('');
+        setShowPayModal(false);
+        setTempPaymentMethod('Efectivo $');
+      }, 500); // Pequeño delay post-impresión
+    }, 500); // Pequeño delay pre-impresión
   };
 
   const getStatusBadge = (status: ServiceStatus) => {
@@ -173,112 +203,143 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       
       {/* 1. INFORME CORPORATIVO TAMAÑO CARTA (PRINT ONLY) */}
       {currentRepair && (
-        <div className="hidden print:block print-only bg-white text-slate-950 p-12 font-sans min-h-screen">
-          <div className="flex justify-between items-start mb-12 border-b-2 border-slate-100 pb-8">
-            <div className="flex gap-6 items-center">
-              <img src={LOGO_URL} alt="Logo" className="w-20 h-20 object-contain grayscale" />
+        <div className="hidden print:block print-only bg-white text-slate-900 p-10 font-sans min-h-screen max-w-[216mm] mx-auto">
+          {/* Header Compacto */}
+          <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
+            <div className="flex gap-4 items-center">
+              <img src={LOGO_URL} alt="Logo" className="w-14 h-14 object-contain grayscale opacity-80" />
               <div>
-                <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">Gonzacars C.A.</h1>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">RIF: J-50030426-9 | Valencia, Edo. Carabobo</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taller Mecánico y Venta de Repuestos</p>
+                <h1 className="text-xl font-black uppercase tracking-tight text-slate-900 leading-none">Gonzacars C.A.</h1>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">RIF: J-50030426-9</p>
+                <p className="text-[9px] font-medium text-slate-400 max-w-[250px] leading-tight mt-1">
+                  Valencia, Edo. Carabobo | Taller Mecánico & Repuestos
+                </p>
               </div>
             </div>
             <div className="text-right">
-              <h2 className="text-lg font-black uppercase text-slate-400 mb-1">Informe de Servicio</h2>
-              <p className="text-2xl font-black text-blue-600">#{currentRepair.id.toUpperCase().slice(-6)}</p>
-              <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{new Date().toLocaleDateString()}</p>
+              <h2 className="text-lg font-black uppercase text-slate-900 tracking-tight leading-none">
+                {currentRepair.status === 'Entregado' ? 'ORDEN DE SERVICIO' : 'PRESUPUESTO'}
+              </h2>
+              <p className="text-xl font-black text-slate-500">#{currentRepair.id.toUpperCase().slice(-6)}</p>
+              <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                EMISIÓN: {new Date().toLocaleString()}
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 mb-12">
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Datos del Cliente</p>
-              <h3 className="text-xl font-black text-slate-900 uppercase">{currentRepair.ownerName}</h3>
-              <p className="text-xs font-bold text-slate-500 mt-1">ID: {currentRepair.customerId}</p>
+          {/* Datos Cliente y Vehículo (Compacto) */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-6 text-xs">
+            <div>
+              <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1 mb-2">Cliente</h3>
+              <p className="font-bold text-slate-900 uppercase text-sm">{currentRepair.ownerName}</p>
+              <p className="font-medium text-slate-500">ID / CI: {currentRepair.customerId}</p>
             </div>
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Detalle del Vehículo</p>
-              <h3 className="text-xl font-black text-slate-900 uppercase">{currentRepair.brand} {currentRepair.model}</h3>
-              <p className="text-xs font-black text-blue-600 mt-1 tracking-widest">PLACA: {currentRepair.plate.toUpperCase()}</p>
+            <div>
+              <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1 mb-2">Vehículo</h3>
+              <div className="flex justify-between items-end">
+                <div>
+                   <p className="font-bold text-slate-900 uppercase text-sm">{currentRepair.brand} {currentRepair.model}</p>
+                   <p className="font-medium text-slate-500">Año: {currentRepair.year}</p>
+                </div>
+                <span className="font-mono font-black text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {currentRepair.plate.toUpperCase()}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="mb-10">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumen de Cargos y Repuestos</h4>
+          {/* Tabla de Items (Estilo Minimalista) */}
+          <div className="mb-6">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b-2 border-slate-900">
-                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Descripción</th>
-                  <th className="py-4 text-center text-[10px] font-black uppercase tracking-widest">Cant.</th>
-                  <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">P. Unit</th>
-                  <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Subtotal</th>
+                <tr className="border-b-2 border-slate-900 text-[9px] font-black uppercase tracking-widest text-slate-600">
+                  <th className="py-2 text-center w-12">Cant.</th>
+                  <th className="py-2">Descripción del Item</th>
+                  <th className="py-2 text-center w-24">Tipo</th>
+                  <th className="py-2 text-right w-24">Precio Unit.</th>
+                  <th className="py-2 text-right w-24">Importe</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="text-[11px] divide-y divide-slate-100 leading-none">
                 {currentRepair.items.map((item, idx) => (
                   <tr key={idx}>
-                    <td className="py-4">
-                      <p className="font-black text-slate-800 uppercase text-xs">{item.description}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">{item.type}</p>
+                    <td className="py-2 text-center font-bold text-slate-500">{item.quantity}</td>
+                    <td className="py-2 font-bold text-slate-800 uppercase tracking-tight">
+                      {item.description}
                     </td>
-                    <td className="py-4 text-center font-bold text-xs">{item.quantity}</td>
-                    <td className="py-4 text-right font-bold text-xs">${item.price.toFixed(2)}</td>
-                    <td className="py-4 text-right font-black text-slate-900 text-sm">${(item.price * item.quantity).toFixed(2)}</td>
+                    <td className="py-2 text-center text-[9px] uppercase font-medium text-slate-400">{item.type}</td>
+                    <td className="py-2 text-right font-medium text-slate-600">${item.price.toFixed(2)}</td>
+                    <td className="py-2 text-right font-black text-slate-900">${(item.price * item.quantity).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="mb-12">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Historial de Abonos</h4>
-            <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
-              <table className="w-full text-left border-collapse">
-                <tbody className="divide-y divide-slate-200">
-                  {currentRepair.installments?.map((inst, idx) => (
-                    <tr key={idx}>
-                      <td className="py-3 px-6 text-[10px] font-bold text-slate-500 uppercase">{new Date(inst.date).toLocaleDateString()}</td>
-                      <td className="py-3 px-6 text-[10px] font-black text-slate-800 uppercase">Abono {inst.method}</td>
-                      <td className="py-3 px-6 text-right font-black text-emerald-600 text-xs">-${inst.amount.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {(!currentRepair.installments || currentRepair.installments.length === 0) && (
-                    <tr>
-                      <td colSpan={3} className="py-4 px-6 text-[10px] font-bold text-slate-400 uppercase text-center italic">Sin abonos registrados</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Historial de Pagos (Compacto) */}
+          <div className="flex gap-8 mb-8">
+            <div className="flex-1">
+              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-1">Pagos Registrados</h4>
+              {currentRepair.installments && currentRepair.installments.length > 0 ? (
+                <table className="w-full text-[10px]">
+                  <tbody>
+                    {currentRepair.installments.map((inst, idx) => (
+                      <tr key={idx} className="border-b border-slate-50 last:border-0">
+                        <td className="py-1 text-slate-500">{new Date(inst.date).toLocaleDateString()}</td>
+                        <td className="py-1 font-bold text-slate-700 uppercase">{inst.method}</td>
+                        <td className="py-1 text-right font-black text-emerald-600">-${inst.amount.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-[9px] text-slate-400 italic">No hay pagos previos registrados.</p>
+              )}
+            </div>
+
+            {/* Totales */}
+            <div className="w-64">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+                <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                  <span>Subtotal:</span>
+                  <span>${calculateTotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-bold text-emerald-600 uppercase">
+                  <span>Abonado:</span>
+                  <span>-${calculatePaid().toFixed(2)}</span>
+                </div>
+                <div className="border-t border-slate-300 pt-2 mt-1 flex justify-between items-end">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-900">Total a Pagar:</span>
+                  <span className="text-xl font-black text-slate-900 leading-none">${calculateBalance().toFixed(2)}</span>
+                </div>
+                <div className="text-right">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">
+                        {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs
+                    </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end pt-8 border-t-2 border-slate-100">
-            <div className="w-72 space-y-3">
-              <div className="flex justify-between items-center text-slate-400 uppercase font-black text-[10px]">
-                <span>Total Cargos:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-emerald-600 uppercase font-black text-[10px]">
-                <span>Total Abonado:</span>
-                <span>-${calculatePaid().toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
-                <span className="font-black uppercase tracking-widest text-xs">Saldo Pendiente:</span>
-                <span className="text-2xl font-black tracking-tighter text-slate-950">${calculateBalance().toFixed(2)}</span>
-              </div>
-              <p className="text-right text-[10px] font-bold text-slate-400 pt-2 uppercase">Equiv: {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs</p>
+          {/* Footer / Firmas */}
+          <div className="mt-auto grid grid-cols-2 gap-16 pt-8 pb-4">
+            <div className="text-center">
+              <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Firma Cliente</p>
+            </div>
+            <div className="text-center">
+              <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Autorizado Por</p>
             </div>
           </div>
-
-          <div className="mt-auto pt-20 grid grid-cols-2 gap-24 px-12 text-center text-[10px] font-black uppercase text-slate-400">
-            <div className="border-t-2 border-slate-200 pt-4">Firma Autorizada</div>
-            <div className="border-t-2 border-slate-200 pt-4">Conformidad Cliente</div>
+          <div className="text-center text-[8px] font-medium text-slate-300 uppercase tracking-widest">
+            Documento generado electrónicamente por Sistema Gonzacars
           </div>
         </div>
       )}
 
       {/* 2. TICKET DE ABONO (PRINT ONLY) */}
-      {lastInstallment && currentRepair && (
+      {lastInstallment && currentRepair && !showPayModal && (
         <div className="hidden print:block print-only bg-white text-slate-900 p-8 font-mono text-[11px] leading-tight" style={{ width: '80mm' }}>
           <div className="text-center mb-4">
             <h3 className="font-black text-sm uppercase">Recibo de Abono</h3>

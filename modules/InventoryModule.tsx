@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Product, Purchase } from '../types';
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
@@ -10,15 +10,71 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const [newPrice, setNewPrice] = useState(0);
   const [newBarcode, setNewBarcode] = useState('');
   
+  // Filtering & Sorting States
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
   // History Modal State
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  const filtered = store.inventory.filter((p: Product) => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.barcode?.includes(searchTerm)
-  );
+  // Derived Data for Filters
+  const categories = useMemo(() => 
+    Array.from(new Set((store.inventory || []).map((p: Product) => p.category))).filter(Boolean).sort()
+  , [store.inventory]);
+
+  const suppliers = useMemo(() => 
+    Array.from(new Set((store.purchases || []).map((p: Purchase) => p.provider))).filter(Boolean).sort()
+  , [store.purchases]);
+
+  // Filtered and Sorted Inventory
+  const filtered = useMemo(() => {
+    let result = (store.inventory || []).filter((p: Product) => 
+      (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.barcode?.includes(searchTerm))
+    );
+
+    if (categoryFilter) {
+      result = result.filter((p: Product) => p.category === categoryFilter);
+    }
+
+    if (supplierFilter) {
+      // Find products supplied by the selected provider
+      // Since purchases might link by Name or ID, we check name primarily as ID might be missing in older purchase records
+      const suppliedProductNames = new Set(
+        (store.purchases || [])
+          .filter((pur: Purchase) => pur.provider === supplierFilter)
+          .map((pur: Purchase) => pur.productName)
+      );
+      result = result.filter((p: Product) => suppliedProductNames.has(p.name));
+    }
+
+    return result.sort((a: Product, b: Product) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      return 0;
+    });
+  }, [store.inventory, store.purchases, searchTerm, categoryFilter, supplierFilter, sortConfig]);
+
+  const handleSort = (key: keyof Product) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const handlePriceUpdate = (id: string) => {
     store.updateInventoryPrice(id, newPrice);
@@ -49,22 +105,75 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     ).sort((a: Purchase, b: Purchase) => b.date.localeCompare(a.date));
   };
 
+  const SortIcon = ({ column }: { column: keyof Product }) => {
+    if (sortConfig.key !== column) return <ArrowDown size={12} className="opacity-20 ml-1" />;
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp size={12} className="text-blue-600 ml-1" /> 
+      : <ArrowDown size={12} className="text-blue-600 ml-1" />;
+  };
+
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Control de Inventario</h3>
           <p className="text-slate-500 font-medium">Gestión de stock, precios y auditoría de abastecimiento</p>
         </div>
-        <div className="relative w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre, categoría o código..." 
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-bold text-sm shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+            <input 
+              type="text" 
+              placeholder="Buscar por nombre, categoría o código..." 
+              className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 transition-all font-bold text-sm shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="flex flex-wrap items-center gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-widest px-2">
+          <Filter size={16} /> Filtros:
+        </div>
+        
+        <div className="relative group">
+          <select 
+            className="appearance-none bg-slate-50 border border-slate-100 pl-4 pr-10 py-2 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-[150px]"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">Todas las Categorías</option>
+            {categories.map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-blue-500" />
+        </div>
+
+        <div className="relative group">
+          <select 
+            className="appearance-none bg-slate-50 border border-slate-100 pl-4 pr-10 py-2 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer min-w-[180px]"
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+          >
+            <option value="">Todos los Proveedores</option>
+            {suppliers.map((s: string) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-blue-500" />
+        </div>
+
+        {(categoryFilter || supplierFilter) && (
+          <button 
+            onClick={() => { setCategoryFilter(''); setSupplierFilter(''); }}
+            className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl transition-all"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
+
+        <div className="ml-auto text-[10px] font-bold text-slate-400">
+           Mostrando {filtered.length} productos
         </div>
       </div>
 
@@ -72,11 +181,21 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Código / Barcode</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Producto</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Stock</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Costo ($)</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Precio Venta ($)</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('barcode')}>
+                <div className="flex items-center">Código / Barcode <SortIcon column="barcode" /></div>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
+                <div className="flex items-center">Producto <SortIcon column="name" /></div>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('quantity')}>
+                <div className="flex items-center justify-center">Stock <SortIcon column="quantity" /></div>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('cost')}>
+                <div className="flex items-center justify-end">Costo ($) <SortIcon column="cost" /></div>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('price')}>
+                <div className="flex items-center justify-end">Precio Venta ($) <SortIcon column="price" /></div>
+              </th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
             </tr>
           </thead>

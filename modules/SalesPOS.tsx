@@ -9,21 +9,20 @@ import {
   Search, 
   Barcode, 
   UserRound, 
-  ClipboardList, 
   X, 
   DollarSign, 
   Wallet, 
   ChevronDown, 
   TrendingUp,
-  CheckCircle2,
-  FileText,
   Clock,
   ArrowUpRight,
   Receipt,
   Percent,
   Tag,
   BarChart3,
-  Package
+  Package,
+  ClipboardList,
+  FileText
 } from 'lucide-react';
 import { Product, PaymentMethod, Sale, Customer } from '../types';
 
@@ -56,11 +55,6 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
   );
 
   const addToCart = (product: Product) => {
-    // Si hay un carrito nuevo, limpiamos la referencia visual de la última venta del modal rápido
-    if (cart.length === 0) {
-      // Opcional: podríamos mantener lastSale pero aquí aseguramos que el foco sea la nueva venta
-    }
-    
     const existing = cart.find(item => item.product.id === product.id);
     if (existing) {
       if (existing.quantity >= product.quantity) return;
@@ -126,14 +120,22 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
 
     const itemsSold = todaySales.flatMap(s => s.items).reduce((acc: number, item) => acc + item.quantity, 0);
 
-    const itemsCount = todaySales.flatMap(s => s.items).reduce((acc: any, item) => {
-      acc[item.name] = (acc[item.name] || 0) + item.quantity;
+    // Agregación de ítems para estadísticas
+    const itemsStats = todaySales.flatMap(s => s.items).reduce((acc: any, item) => {
+      if (!acc[item.name]) {
+        acc[item.name] = { name: item.name, qty: 0, val: 0 };
+      }
+      acc[item.name].qty += item.quantity;
+      acc[item.name].val += (item.price * item.quantity);
       return acc;
     }, {});
 
-    const topItems = Object.entries(itemsCount)
-      .map(([name, qty]) => ({ name, qty: qty as number }))
-      .sort((a, b) => b.qty - a.qty)
+    const topItemsByQty = Object.values(itemsStats)
+      .sort((a: any, b: any) => b.qty - a.qty)
+      .slice(0, 5);
+
+    const topItemsByValue = Object.values(itemsStats)
+      .sort((a: any, b: any) => b.val - a.val)
       .slice(0, 5);
 
     const ticketPromedio = todaySales.length > 0 ? totalUSD / todaySales.length : 0;
@@ -143,7 +145,8 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
       totalUSD, 
       totalBS, 
       count: todaySales.length, 
-      topItems, 
+      topItemsByQty,
+      topItemsByValue, 
       todaySales,
       itemsSold,
       ticketPromedio 
@@ -341,7 +344,7 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
         </div>
       </div>
 
-      {/* Ticket Invisible para Impresión */}
+      {/* Ticket Invisible para Impresión (Factura) */}
       {lastSale && (
         <div className="print-only p-8 bg-white text-slate-900 w-full" style={{ maxWidth: '80mm' }}>
           <div className="text-center mb-6">
@@ -416,59 +419,10 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {showReceiptModal && lastSale && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 no-print">
-          <div className="bg-white rounded-[3.5rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-500">
-            <div className="bg-emerald-600 p-10 text-white text-center relative overflow-hidden">
-               <div className="absolute top-[-20%] right-[-10%] opacity-10 rotate-12 scale-150">
-                  <ShoppingCart size={180} />
-               </div>
-               <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-white/30 backdrop-blur-md rotate-6 p-3">
-                  <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
-               </div>
-               <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Venta Procesada</h3>
-               <p className="text-emerald-100 text-[10px] font-black uppercase tracking-[0.3em] mt-3 opacity-80">Comprobante #{lastSale.id}</p>
-            </div>
-            
-            <div className="p-10">
-               <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 space-y-5 mb-10">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Facturado</span>
-                    <span className="text-3xl font-black text-slate-900 tracking-tighter">${Number(lastSale.total).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-t border-slate-200 pt-5">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">En Moneda Local</span>
-                    <span className="text-xl font-black text-emerald-600 tracking-tight">{(Number(lastSale.total) * Number(store.exchangeRate)).toLocaleString('es-VE')} Bs</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Método</span>
-                    <span className="text-[10px] font-black uppercase bg-white px-4 py-1.5 rounded-xl border border-slate-200 shadow-sm">{lastSale.paymentMethod}</span>
-                  </div>
-               </div>
-
-               <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handlePrint}
-                    className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all active:scale-95"
-                  >
-                    <Printer size={18}/> Imprimir Ticket de Venta
-                  </button>
-                  <button 
-                    onClick={() => setShowReceiptModal(false)}
-                    className="w-full py-4 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors"
-                  >
-                    Cerrar Ventana
-                  </button>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Modal de Reporte Diario (Arqueo) */}
       {showDailyReport && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 no-print">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-5xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-8 duration-500 border border-slate-200">
-            {/* Header Reporte */}
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-8 duration-500 border border-slate-200">
             <div className="p-10 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-5">
                  <BarChart3 size={160} />
@@ -495,18 +449,18 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
               {(() => {
                 const report = getDailyTotals();
                 return (
-                  <div className="space-y-10">
+                  <div className="space-y-12">
                     {/* Tarjetas Principales */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative group">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ingreso Bruto (USD)</p>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-black text-slate-900 tracking-tighter">${Number(report.totalUSD).toFixed(2)}</span>
+                          <span className="text-4xl font-black text-slate-900 tracking-tighter">${report.totalUSD.toFixed(2)}</span>
                           <ArrowUpRight size={20} className="text-emerald-500" />
                         </div>
                         <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase">Equivalente en Bolívares</p>
-                          <p className="text-xl font-black text-emerald-700 tracking-tight">{Number(report.totalBS).toLocaleString('es-VE')} Bs</p>
+                          <p className="text-[10px] font-black text-emerald-600 uppercase">En Bolívares</p>
+                          <p className="text-xl font-black text-emerald-700 tracking-tight">{report.totalBS.toLocaleString('es-VE')} Bs</p>
                         </div>
                       </div>
 
@@ -516,7 +470,7 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                           <span className="text-4xl font-black text-blue-600 tracking-tighter">${report.ticketPromedio.toFixed(2)}</span>
                         </div>
                         <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase">Volumen de Transacciones</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Volumen Diario</p>
                           <p className="text-xl font-black text-slate-900">{report.count} Ventas</p>
                         </div>
                       </div>
@@ -528,76 +482,55 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                           <Tag size={20} className="text-purple-200" />
                         </div>
                         <div className="mt-4 pt-4 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase">En Inventario Restado</p>
-                          <p className="text-xl font-black text-slate-900">Unidades Totales</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Total Unidades</p>
+                          <p className="text-xl font-black text-slate-900">Salida de Stock</p>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-slate-900/20 relative overflow-hidden flex flex-col justify-between">
+                      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between">
                         <DollarSign className="absolute -bottom-4 -right-4 text-white/5" size={140} />
                         <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tasa de Cambio</p>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tasa Ref.</p>
                           <p className="text-2xl font-black tracking-tight text-blue-400">{store.exchangeRate.toFixed(2)} Bs/$</p>
-                        </div>
-                        <div className="mt-auto">
-                           <p className="text-[9px] font-bold text-slate-400 uppercase italic leading-tight">Valor utilizado para todas las conversiones de este reporte.</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                       {/* Desglose por Método */}
-                      <div className="lg:col-span-7 space-y-6">
+                      <div className="lg:col-span-12 space-y-6">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                           <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
                             <Wallet size={18} className="text-blue-500" /> Desglose por Método de Pago
                           </h4>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Auditoría Multi-divisa</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                           {['Efectivo $', 'Efectivo Bs', 'Pago Móvil', 'TDD', 'TDC', 'Zelle'].map((method) => {
                             const amount = Number(report.totalsByMethod[method] || 0);
-                            const amountBs = amount * Number(store.exchangeRate);
                             return (
-                              <div key={method} className="bg-white p-6 rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group border-l-4 border-l-transparent hover:border-l-blue-600">
-                                <div className="flex justify-between items-start mb-4">
-                                  <span className="font-black text-slate-800 text-[11px] uppercase tracking-tighter">{method}</span>
-                                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                                    <Receipt size={14} />
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="font-black text-slate-950 text-2xl tracking-tighter">${amount.toFixed(2)}</p>
-                                  <p className="text-xs font-black text-emerald-600">
-                                    {amountBs.toLocaleString('es-VE')} Bs
-                                  </p>
-                                </div>
+                              <div key={method} className="bg-white p-6 rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
+                                <span className="font-black text-slate-400 text-[9px] uppercase block mb-3">{method}</span>
+                                <p className="font-black text-slate-950 text-xl tracking-tighter">${amount.toFixed(2)}</p>
                               </div>
                             );
                           })}
                         </div>
                       </div>
 
-                      {/* Top Productos Refinado */}
-                      <div className="lg:col-span-5 space-y-6">
+                      {/* Top Productos por Cantidad */}
+                      <div className="lg:col-span-6 space-y-6">
                         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                           <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <TrendingUp size={18} className="text-blue-500" /> Repuestos Más Vendidos
+                            <TrendingUp size={18} className="text-blue-500" /> Top Vendidos (Cantidad)
                           </h4>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Top 5</span>
                         </div>
-                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-6 shadow-sm">
-                          {report.topItems.map((item, idx) => {
+                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
+                          {report.topItemsByQty.map((item: any, idx: number) => {
                             const percentage = (item.qty / report.itemsSold) * 100;
                             return (
                               <div key={idx} className="space-y-2 group">
                                 <div className="flex justify-between items-center">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-[10px] font-black text-white group-hover:bg-blue-600 transition-all">
-                                      {idx + 1}
-                                    </div>
-                                    <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[200px]">{item.name}</span>
-                                  </div>
+                                  <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
                                   <span className="font-black text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full whitespace-nowrap">{item.qty} unid.</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -609,12 +542,34 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
                               </div>
                             );
                           })}
-                          {report.topItems.length === 0 && (
-                            <div className="text-center py-16 opacity-30 flex flex-col items-center">
-                              <Package size={48} className="mb-4" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sin datos de salida hoy</p>
-                            </div>
-                          )}
+                        </div>
+                      </div>
+
+                      {/* Top Productos por Valor */}
+                      <div className="lg:col-span-6 space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                          <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <DollarSign size={18} className="text-emerald-500" /> Top Rendimiento (Valor)
+                          </h4>
+                        </div>
+                        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 space-y-4 shadow-sm">
+                          {report.topItemsByValue.map((item: any, idx: number) => {
+                            const percentage = (item.val / report.totalUSD) * 100;
+                            return (
+                              <div key={idx} className="space-y-2 group">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-black text-slate-800 text-xs uppercase truncate max-w-[250px]">{item.name}</span>
+                                  <span className="font-black text-emerald-600 text-xs bg-emerald-50 px-3 py-1 rounded-full whitespace-nowrap">${item.val.toFixed(2)}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                   <div 
+                                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
+                                    style={{ width: `${percentage}%` }}
+                                   />
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -623,13 +578,12 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
               })()}
             </div>
 
-            {/* Footer Reporte */}
             <div className="p-8 bg-white border-t border-slate-100 flex gap-4 no-print">
               <button 
                 onClick={() => window.print()}
-                className="flex-1 bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-[11px] tracking-[0.3em] hover:bg-black transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3"
+                className="flex-1 bg-slate-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-[11px] tracking-[0.3em] hover:bg-black transition-all shadow-2xl flex items-center justify-center gap-3"
               >
-                <Printer size={20} /> Generar Reporte de Cierre para Contabilidad
+                <Printer size={20} /> Imprimir Reporte de Cierre
               </button>
             </div>
           </div>
