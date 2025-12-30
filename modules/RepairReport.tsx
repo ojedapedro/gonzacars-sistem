@@ -175,6 +175,9 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
     // 4. Guardar en Store y Actualizar Estado Local para que el PDF salga actualizado
     store.updateRepair(updated);
     setCurrentRepair(updated);
+    
+    // Asegurar que no se imprima el ticket de abono suelto
+    setLastInstallment(null);
 
     // 5. Esperar un momento para que React renderice el estado actualizado y lanzar impresión
     setTimeout(() => {
@@ -218,7 +221,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
             <div className="text-right">
               <h2 className="text-lg font-black uppercase text-slate-900 tracking-tight leading-none">
-                {currentRepair.status === 'Entregado' ? 'ORDEN DE SERVICIO' : 'PRESUPUESTO'}
+                {currentRepair.status === 'Entregado' ? 'ORDEN DE SERVICIO - ENTREGADO' : 'PRESUPUESTO PRELIMINAR'}
               </h2>
               <p className="text-xl font-black text-slate-500">#{currentRepair.id.toUpperCase().slice(-6)}</p>
               <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
@@ -502,7 +505,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {/* MODAL ABONO */}
       {showAbonoModal && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 print:hidden">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full p-12 text-center animate-in zoom-in duration-300">
             <h3 className="text-3xl font-black text-slate-900 mb-2 uppercase tracking-tight">Registrar Abono</h3>
             <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-10">Monto del pago parcial</p>
@@ -528,7 +531,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {/* MODAL RECIBO ABONO (RESULTADO) */}
       {showAbonoReceipt && lastInstallment && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center z-[110] p-4">
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center z-[110] p-4 print:hidden">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in duration-300">
             <div className="bg-emerald-600 p-8 text-white text-center">
               <Receipt size={48} className="mx-auto mb-4 opacity-50" />
@@ -559,7 +562,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {/* MODAL ENTREGA FINAL */}
       {showPayModal && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4 print:hidden">
           <div className="bg-white rounded-[4rem] shadow-2xl max-w-xl w-full p-16 text-center border-8 border-slate-100 animate-in zoom-in duration-300">
             <h3 className="text-5xl font-black mb-6 text-slate-900 uppercase tracking-tighter">Finalizar Orden</h3>
             <p className="text-slate-500 mb-10 font-bold text-xl leading-relaxed">
@@ -587,7 +590,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
       {/* MODAL BÚSQUEDA INVENTARIO */}
       {showInventorySearch && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4 no-print">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center z-[100] p-4 no-print print:hidden">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[85vh] overflow-hidden border-8 border-slate-100">
             <div className="p-10 border-b border-slate-100 bg-slate-50/50">
               <div className="flex justify-between items-center mb-8">
