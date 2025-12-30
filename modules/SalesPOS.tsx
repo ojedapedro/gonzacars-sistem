@@ -102,6 +102,12 @@ const SalesPOS: React.FC<{ store: any }> = ({ store }) => {
     store.addSale(newSale);
     setLastSale(newSale);
     setShowReceiptModal(true);
+
+    // Disparar impresión automática al procesar
+    setTimeout(() => {
+      window.print();
+    }, 500);
+    
     setCart([]);
     setSelectedCustomer(null);
   };
