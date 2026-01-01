@@ -41,9 +41,10 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
       return { sales: sBase, purchases: pBase, expenses: eBase };
     } else if (viewMode === 'daily') {
       return {
-        sales: sBase.filter((s: any) => s.date === filterDate),
-        purchases: pBase.filter((p: any) => p.date === filterDate),
-        expenses: eBase.filter((e: any) => e.date === filterDate)
+        // Normalizamos la comparación de fechas
+        sales: sBase.filter((s: any) => s.date.split('T')[0] === filterDate),
+        purchases: pBase.filter((p: any) => p.date.split('T')[0] === filterDate),
+        expenses: eBase.filter((e: any) => e.date.split('T')[0] === filterDate)
       };
     }
     return { sales: [], purchases: [], expenses: [] };
@@ -53,31 +54,33 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
   const historyData = useMemo(() => {
     const dates = new Set<string>();
     
-    // Recolectar todas las fechas únicas
-    store.sales.forEach((s: Sale) => dates.add(s.date));
-    store.purchases.forEach((p: Purchase) => dates.add(p.date));
-    store.expenses.forEach((e: Expense) => dates.add(e.date));
+    // Recolectar todas las fechas únicas normalizadas (YYYY-MM-DD)
+    store.sales.forEach((s: Sale) => { if(s.date) dates.add(s.date.split('T')[0]); });
+    store.purchases.forEach((p: Purchase) => { if(p.date) dates.add(p.date.split('T')[0]); });
+    store.expenses.forEach((e: Expense) => { if(e.date) dates.add(e.date.split('T')[0]); });
     store.repairs.forEach((r: VehicleRepair) => {
-      if(r.installments) r.installments.forEach(i => dates.add(i.date.split('T')[0]));
+      if(r.installments) r.installments.forEach(i => { if(i.date) dates.add(i.date.split('T')[0]); });
     });
 
     const history = Array.from(dates).map(date => {
+      if (!date) return null;
+
       // Ventas POS
-      const daySales = store.sales.filter((s: Sale) => s.date === date)
+      const daySales = store.sales.filter((s: Sale) => s.date && s.date.split('T')[0] === date)
         .reduce((sum: number, s: Sale) => sum + s.total, 0);
       
       // Ingresos Taller
       const dayWorkshop = store.repairs.reduce((acc: number, repair: VehicleRepair) => {
-        const dailyPaid = (repair.installments || []).filter((inst: Installment) => inst.date.split('T')[0] === date)
+        const dailyPaid = (repair.installments || []).filter((inst: Installment) => inst.date && inst.date.split('T')[0] === date)
           .reduce((sum: number, inst: Installment) => sum + Number(inst.amount), 0);
         return acc + dailyPaid;
       }, 0);
 
       // Egresos
-      const dayPurchases = store.purchases.filter((p: Purchase) => p.date === date)
+      const dayPurchases = store.purchases.filter((p: Purchase) => p.date && p.date.split('T')[0] === date)
         .reduce((sum: number, p: Purchase) => sum + p.total, 0);
       
-      const dayExpenses = store.expenses.filter((e: Expense) => e.date === date)
+      const dayExpenses = store.expenses.filter((e: Expense) => e.date && e.date.split('T')[0] === date)
         .reduce((sum: number, e: Expense) => sum + e.amount, 0);
 
       const revenue = daySales + dayWorkshop;
@@ -91,7 +94,7 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
         pos: daySales,
         workshop: dayWorkshop
       };
-    });
+    }).filter(item => item !== null) as any[];
 
     // Ordenar descendente por fecha
     return history.sort((a, b) => b.date.localeCompare(a.date));
