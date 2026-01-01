@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { Product, Purchase } from '../types';
+import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save } from 'lucide-react';
+import { Product, Purchase, Sale } from '../types';
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,9 +15,14 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
-  // History Modal State
+  // History & Audit Modal States
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  
+  // Audit Form State
+  const [physicalCount, setPhysicalCount] = useState<number>(0);
+  const [auditReason, setAuditReason] = useState('');
 
   // Derived Data for Filters
   const categories = useMemo(() => 
@@ -41,8 +46,6 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     }
 
     if (supplierFilter) {
-      // Find products supplied by the selected provider
-      // Since purchases might link by Name or ID, we check name primarily as ID might be missing in older purchase records
       const suppliedProductNames = new Set(
         (store.purchases || [])
           .filter((pur: Purchase) => pur.provider === supplierFilter)
@@ -99,10 +102,61 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     setShowHistoryModal(true);
   };
 
-  const getProductHistory = (product: Product): Purchase[] => {
-    return store.purchases.filter((p: Purchase) => 
-      p.productId === product.id || p.productName === product.name
-    ).sort((a: Purchase, b: Purchase) => b.date.localeCompare(a.date));
+  const openAudit = (product: Product) => {
+    setSelectedProduct(product);
+    setPhysicalCount(product.quantity); // Default to current system stock
+    setAuditReason('');
+    setShowAuditModal(true);
+  };
+
+  const submitAudit = () => {
+    if (!selectedProduct) return;
+    if (physicalCount < 0) return alert("La cantidad no puede ser negativa");
+    
+    // Update store
+    store.updateInventoryQuantity(selectedProduct.id, physicalCount);
+    
+    alert(`Inventario ajustado correctamente.\nSistema: ${selectedProduct.quantity} -> Físico: ${physicalCount}\nMotivo: ${auditReason || 'Auditoría de rutina'}`);
+    setShowAuditModal(false);
+  };
+
+  // KARDEX LOGIC: Combine Purchases (Entries) and Sales (Exits)
+  const getProductMovements = (product: Product) => {
+    const movements: any[] = [];
+
+    // Add Purchases (Entries)
+    store.purchases.forEach((p: Purchase) => {
+      if (p.productId === product.id || p.productName === product.name) {
+        movements.push({
+          id: p.id,
+          date: p.date,
+          type: 'ENTRADA',
+          quantity: p.quantity,
+          price: p.price,
+          reference: p.provider,
+          doc: `Fac. ${p.invoiceNumber}`
+        });
+      }
+    });
+
+    // Add Sales (Exits)
+    store.sales.forEach((s: Sale) => {
+      const soldItem = s.items.find(i => i.productId === product.id || i.name === product.name);
+      if (soldItem) {
+        movements.push({
+          id: s.id,
+          date: s.date,
+          type: 'SALIDA',
+          quantity: soldItem.quantity,
+          price: soldItem.price,
+          reference: s.customerName,
+          doc: `Venta #${s.id.substring(0,6)}`
+        });
+      }
+    });
+
+    // Sort descending by date
+    return movements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
   const SortIcon = ({ column }: { column: keyof Product }) => {
@@ -243,7 +297,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                   {editingId === p.id ? (
                     <input 
                       type="number" 
-                      step="0.01"
+                      step="0.01" 
                       className="w-24 px-3 py-1.5 border border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-50 outline-none font-black text-right text-sm"
                       value={newPrice}
                       onChange={(e) => setNewPrice(Number(e.target.value))}
@@ -266,10 +320,17 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                     </button>
                     <button 
                       onClick={() => openHistory(p)} 
-                      title="Ver Historial de Compras"
+                      title="Auditoría de Movimientos (Kardex)"
                       className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                     >
                       <History size={18}/>
+                    </button>
+                    <button 
+                      onClick={() => openAudit(p)} 
+                      title="Conteo Físico (Ajuste de Inventario)"
+                      className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all"
+                    >
+                      <ClipboardCheck size={18}/>
                     </button>
                     <button 
                       onClick={() => regenerateBarcode(p.id)} 
@@ -295,7 +356,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
         )}
       </div>
 
-      {/* Product Purchase History Modal */}
+      {/* MODAL DE HISTORIAL (KARDEX) */}
       {showHistoryModal && selectedProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in duration-300">
@@ -308,10 +369,10 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                     <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center">
                       <History size={20} />
                     </div>
-                    <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Historial de Compras</h3>
+                    <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Kardex de Producto</h3>
                   </div>
                   <div className="mt-4">
-                    <p className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em]">Auditoría de Suministro</p>
+                    <p className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em]">Auditoría de Entradas y Salidas</p>
                     <p className="text-slate-300 font-bold text-xl uppercase tracking-tight mt-1">{selectedProduct.name}</p>
                     <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Barcode: {selectedProduct.barcode || 'N/A'}</p>
                   </div>
@@ -323,21 +384,21 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
 
             <div className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-slate-50/50">
               {(() => {
-                const history = getProductHistory(selectedProduct);
+                const history = getProductMovements(selectedProduct);
                 return history.length > 0 ? (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Unidades Compradas</p>
-                          <p className="text-3xl font-black text-slate-900 tracking-tighter">{history.reduce((acc, h) => acc + Number(h.quantity || 0), 0)}</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Stock Actual (Sistema)</p>
+                          <p className="text-3xl font-black text-slate-900 tracking-tighter">{selectedProduct.quantity} u.</p>
                        </div>
                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ultimo Costo Registrado</p>
-                          <p className="text-3xl font-black text-emerald-600 tracking-tighter">${Number(history[0].price || 0).toFixed(2)}</p>
-                       </div>
-                       <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Veces Abastecido</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Movimientos</p>
                           <p className="text-3xl font-black text-blue-600 tracking-tighter">{history.length}</p>
+                       </div>
+                       <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Último Costo</p>
+                          <p className="text-3xl font-black text-emerald-600 tracking-tighter">${selectedProduct.cost.toFixed(2)}</p>
                        </div>
                     </div>
 
@@ -346,35 +407,39 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-100">
                             <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Proveedor</th>
+                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Tipo</th>
+                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Referencia / Documento</th>
                             <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Cantidad</th>
-                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Costo ($)</th>
-                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Total</th>
+                            <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Valor Unit.</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {history.map((h) => (
-                            <tr key={h.id} className="hover:bg-slate-50/80 transition-colors group">
+                            <tr key={`${h.type}-${h.id}`} className="hover:bg-slate-50/80 transition-colors group">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center gap-2 text-slate-500">
-                                   <Calendar size={12} className="text-emerald-500" />
+                                   <Calendar size={12} className="text-slate-400" />
                                    <span className="text-xs font-bold">{new Date(h.date).toLocaleDateString()}</span>
                                 </div>
                               </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className={`flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${h.type === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                   {h.type === 'ENTRADA' ? <TrendingUp size={10} /> : <TrendingDown size={10} />} {h.type}
+                                </span>
+                              </td>
                               <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                   <Truck size={12} className="text-blue-400" />
-                                   <span className="text-xs font-black text-slate-700 uppercase truncate max-w-[150px]">{h.provider}</span>
+                                <div className="flex flex-col">
+                                   <span className="text-xs font-black text-slate-800 uppercase truncate max-w-[150px]">{h.reference}</span>
+                                   <span className="text-[9px] font-bold text-slate-400">{h.doc}</span>
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <span className="text-xs font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-full">{h.quantity}</span>
+                                <span className="text-xs font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-full">
+                                    {h.type === 'SALIDA' ? '-' : '+'}{h.quantity}
+                                </span>
                               </td>
                               <td className="px-6 py-4 text-right">
                                 <span className="text-xs font-black text-slate-500">${Number(h.price || 0).toFixed(2)}</span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                <span className="text-sm font-black text-emerald-600">${Number(h.total || 0).toFixed(2)}</span>
                               </td>
                             </tr>
                           ))}
@@ -385,23 +450,85 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                 ) : (
                   <div className="py-24 text-center">
                      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-300">
-                        <Truck size={32} />
+                        <History size={32} />
                      </div>
-                     <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">No hay órdenes de compra vinculadas a este producto.</p>
-                     <p className="text-slate-400 text-[9px] mt-1 italic">Solo se muestran productos registrados a través del módulo de Compras.</p>
+                     <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Sin movimientos registrados</p>
+                     <p className="text-slate-400 text-[9px] mt-1 italic">No hay compras ni ventas vinculadas a este producto aún.</p>
                   </div>
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="p-8 border-t border-slate-100 flex justify-end">
-               <button 
-                onClick={() => setShowHistoryModal(false)}
-                className="bg-slate-900 text-white px-10 py-4 rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200"
-               >
-                 Entendido
-               </button>
-            </div>
+      {/* MODAL DE AUDITORÍA FÍSICA (CONTEO) */}
+      {showAuditModal && selectedProduct && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-300 border border-slate-100">
+             <div className="p-8 bg-white border-b border-slate-100 text-center relative">
+                <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-500">
+                   <ClipboardCheck size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Ajuste de Stock</h3>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Conteo Físico vs. Sistema</p>
+                <button onClick={() => setShowAuditModal(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500">
+                    <X size={24} />
+                </button>
+             </div>
+             
+             <div className="p-8 space-y-6">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex justify-between items-center">
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock en Sistema</p>
+                        <p className="text-3xl font-black text-slate-900">{selectedProduct.quantity} <span className="text-sm text-slate-400 font-bold">Unid.</span></p>
+                    </div>
+                    <ArrowRight size={24} className="text-slate-300" />
+                    <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Diferencia</p>
+                        <p className={`text-3xl font-black ${physicalCount - selectedProduct.quantity < 0 ? 'text-red-500' : physicalCount - selectedProduct.quantity > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>
+                            {physicalCount - selectedProduct.quantity > 0 ? '+' : ''}{physicalCount - selectedProduct.quantity}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Conteo Físico Real</label>
+                    <input 
+                      type="number" 
+                      autoFocus
+                      className="w-full px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl outline-none focus:border-orange-500 text-center font-black text-2xl"
+                      value={physicalCount}
+                      onChange={(e) => setPhysicalCount(Number(e.target.value))}
+                    />
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Motivo del Ajuste</label>
+                    <textarea 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-sm h-24 resize-none"
+                        placeholder="Ej: Merma, Robo, Error de entrada, Devolución..."
+                        value={auditReason}
+                        onChange={(e) => setAuditReason(e.target.value)}
+                    />
+                </div>
+
+                {physicalCount !== selectedProduct.quantity && (
+                    <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-xl">
+                        <AlertTriangle size={16} className="text-orange-500 mt-0.5 shrink-0"/>
+                        <p className="text-[10px] font-bold text-orange-800 leading-tight">
+                            Esta acción modificará el inventario permanentemente. Asegúrese de que el conteo es correcto.
+                        </p>
+                    </div>
+                )}
+
+                <button 
+                    onClick={submitAudit}
+                    className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2"
+                >
+                    <Save size={18} /> Confirmar Ajuste
+                </button>
+             </div>
           </div>
         </div>
       )}
