@@ -1,13 +1,18 @@
 
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw, Wrench, ShoppingBag, History, Eye, Calendar } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw, Wrench, ShoppingBag, History, Eye, Calendar, Filter, X } from 'lucide-react';
 import { generateFinanceAudit } from '../lib/gemini';
 import { VehicleRepair, Installment, Sale, Purchase, Expense } from '../types';
 
 const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
   const [viewMode, setViewMode] = useState<'general' | 'daily' | 'history'>('daily');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Filtros de rango para el historial
+  const [historyStart, setHistoryStart] = useState('');
+  const [historyEnd, setHistoryEnd] = useState('');
+
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
@@ -100,6 +105,15 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
     return history.sort((a, b) => b.date.localeCompare(a.date));
   }, [store.sales, store.repairs, store.purchases, store.expenses]);
 
+  // 4. Filtrar Historial por Rango Seleccionado
+  const filteredHistory = useMemo(() => {
+    return historyData.filter(day => {
+      if (historyStart && day.date < historyStart) return false;
+      if (historyEnd && day.date > historyEnd) return false;
+      return true;
+    });
+  }, [historyData, historyStart, historyEnd]);
+
   const posSales = filteredData.sales.reduce((acc: number, s: any) => acc + Number(s.total || 0), 0);
   const totalPurchases = filteredData.purchases.reduce((acc: number, p: any) => acc + Number(p.total || 0), 0);
   const totalExpenses = filteredData.expenses.reduce((acc: number, e: any) => acc + Number(e.amount || 0), 0);
@@ -178,15 +192,48 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
 
       {viewMode === 'history' ? (
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
-           <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+           <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
               <div>
                 <h4 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Historial de Movimientos</h4>
                 <p className="text-xs text-slate-500 font-medium mt-1">Desglose cronológico de ingresos y egresos diarios.</p>
               </div>
-              <div className="bg-white p-2 rounded-xl border border-slate-200 text-slate-400">
-                 <History size={20} />
+              
+              {/* Filtros de Fecha */}
+              <div className="flex flex-wrap items-end gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 text-slate-400 px-2">
+                   <Filter size={14} />
+                   <span className="text-[10px] font-black uppercase tracking-widest">Rango:</span>
+                </div>
+                <div>
+                   <label className="block text-[8px] font-black text-slate-300 uppercase ml-2 mb-0.5">Desde</label>
+                   <input 
+                      type="date" 
+                      className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none text-slate-600"
+                      value={historyStart}
+                      onChange={(e) => setHistoryStart(e.target.value)}
+                   />
+                </div>
+                <div>
+                   <label className="block text-[8px] font-black text-slate-300 uppercase ml-2 mb-0.5">Hasta</label>
+                   <input 
+                      type="date" 
+                      className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none text-slate-600"
+                      value={historyEnd}
+                      onChange={(e) => setHistoryEnd(e.target.value)}
+                   />
+                </div>
+                {(historyStart || historyEnd) && (
+                   <button 
+                      onClick={() => { setHistoryStart(''); setHistoryEnd(''); }}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all h-[34px]"
+                      title="Limpiar Filtros"
+                   >
+                      <X size={16} />
+                   </button>
+                )}
               </div>
            </div>
+           
            <div className="overflow-x-auto">
              <table className="w-full text-left">
                <thead>
@@ -199,7 +246,7 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
-                 {historyData.map((day) => (
+                 {filteredHistory.map((day) => (
                    <tr key={day.date} className="hover:bg-slate-50/50 transition-colors">
                      <td className="px-8 py-5">
                        <div className="flex items-center gap-3">
@@ -235,10 +282,10 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
                      </td>
                    </tr>
                  ))}
-                 {historyData.length === 0 && (
+                 {filteredHistory.length === 0 && (
                    <tr>
                      <td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs">
-                       No hay historial registrado aún
+                       {historyData.length === 0 ? "No hay historial registrado aún" : "No se encontraron movimientos en este rango de fechas"}
                      </td>
                    </tr>
                  )}
