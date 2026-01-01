@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw, Wrench, ShoppingBag } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Calendar as CalendarIcon, Sparkles, Loader2, RefreshCw, Wrench, ShoppingBag, History, Eye, Calendar } from 'lucide-react';
 import { generateFinanceAudit } from '../lib/gemini';
-import { VehicleRepair, Installment } from '../types';
+import { VehicleRepair, Installment, Sale, Purchase, Expense } from '../types';
 
 const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
-  const [viewMode, setViewMode] = useState<'general' | 'daily'>('daily');
+  const [viewMode, setViewMode] = useState<'general' | 'daily' | 'history'>('daily');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -16,24 +16,22 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
     const repairs: VehicleRepair[] = Array.isArray(store.repairs) ? store.repairs : [];
     
     if (viewMode === 'general') {
-      // Suma de todos los abonos históricos
       return repairs.reduce((acc, repair) => {
         const totalPaid = (repair.installments || []).reduce((sum, inst) => sum + Number(inst.amount), 0);
         return acc + totalPaid;
       }, 0);
-    } else {
-      // Suma solo los abonos realizados en la fecha seleccionada
+    } else if (viewMode === 'daily') {
       return repairs.reduce((acc, repair) => {
         const dailyPaid = (repair.installments || []).filter((inst: Installment) => {
-          // Extraer YYYY-MM-DD del ISO string del abono
           return inst.date.split('T')[0] === filterDate;
         }).reduce((sum, inst) => sum + Number(inst.amount), 0);
         return acc + dailyPaid;
       }, 0);
     }
+    return 0;
   }, [store.repairs, viewMode, filterDate]);
 
-  // 2. Calcular Ingresos del POS y Gastos
+  // 2. Calcular Ingresos del POS y Gastos para vistas General/Diaria
   const filteredData = useMemo(() => {
     const sBase = Array.isArray(store.sales) ? store.sales : [];
     const pBase = Array.isArray(store.purchases) ? store.purchases : [];
@@ -41,20 +39,68 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
 
     if (viewMode === 'general') {
       return { sales: sBase, purchases: pBase, expenses: eBase };
-    } else {
+    } else if (viewMode === 'daily') {
       return {
         sales: sBase.filter((s: any) => s.date === filterDate),
         purchases: pBase.filter((p: any) => p.date === filterDate),
         expenses: eBase.filter((e: any) => e.date === filterDate)
       };
     }
+    return { sales: [], purchases: [], expenses: [] };
   }, [store.sales, store.purchases, store.expenses, viewMode, filterDate]);
+
+  // 3. Generar Datos Consolidados para la vista "Historial" (Tabla por fechas)
+  const historyData = useMemo(() => {
+    const dates = new Set<string>();
+    
+    // Recolectar todas las fechas únicas
+    store.sales.forEach((s: Sale) => dates.add(s.date));
+    store.purchases.forEach((p: Purchase) => dates.add(p.date));
+    store.expenses.forEach((e: Expense) => dates.add(e.date));
+    store.repairs.forEach((r: VehicleRepair) => {
+      if(r.installments) r.installments.forEach(i => dates.add(i.date.split('T')[0]));
+    });
+
+    const history = Array.from(dates).map(date => {
+      // Ventas POS
+      const daySales = store.sales.filter((s: Sale) => s.date === date)
+        .reduce((sum: number, s: Sale) => sum + s.total, 0);
+      
+      // Ingresos Taller
+      const dayWorkshop = store.repairs.reduce((acc: number, repair: VehicleRepair) => {
+        const dailyPaid = (repair.installments || []).filter((inst: Installment) => inst.date.split('T')[0] === date)
+          .reduce((sum: number, inst: Installment) => sum + Number(inst.amount), 0);
+        return acc + dailyPaid;
+      }, 0);
+
+      // Egresos
+      const dayPurchases = store.purchases.filter((p: Purchase) => p.date === date)
+        .reduce((sum: number, p: Purchase) => sum + p.total, 0);
+      
+      const dayExpenses = store.expenses.filter((e: Expense) => e.date === date)
+        .reduce((sum: number, e: Expense) => sum + e.amount, 0);
+
+      const revenue = daySales + dayWorkshop;
+      const expenses = dayPurchases + dayExpenses;
+
+      return {
+        date,
+        revenue,
+        expenses,
+        balance: revenue - expenses,
+        pos: daySales,
+        workshop: dayWorkshop
+      };
+    });
+
+    // Ordenar descendente por fecha
+    return history.sort((a, b) => b.date.localeCompare(a.date));
+  }, [store.sales, store.repairs, store.purchases, store.expenses]);
 
   const posSales = filteredData.sales.reduce((acc: number, s: any) => acc + Number(s.total || 0), 0);
   const totalPurchases = filteredData.purchases.reduce((acc: number, p: any) => acc + Number(p.total || 0), 0);
   const totalExpenses = filteredData.expenses.reduce((acc: number, e: any) => acc + Number(e.amount || 0), 0);
   
-  // 3. Totales Consolidados
   const totalRevenue = posSales + workshopIncome;
   const balance = totalRevenue - (totalPurchases + totalExpenses);
 
@@ -62,7 +108,7 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
     setIsAiLoading(true);
     try {
       const analysis = await generateFinanceAudit({
-        sales: totalRevenue, // Enviamos el total consolidado a la IA
+        sales: totalRevenue, 
         purchases: totalPurchases,
         expenses: totalExpenses,
         balance: balance,
@@ -96,6 +142,12 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+  const goToDate = (date: string) => {
+    setFilterDate(date);
+    setViewMode('daily');
+    setAiAnalysis(null);
+  };
+
   return (
     <div className="p-8 pb-20 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
@@ -108,61 +160,139 @@ const FinanceModule: React.FC<{ store: any }> = ({ store }) => {
           <div className="flex bg-slate-100 p-1 rounded-2xl">
             <button onClick={() => setViewMode('general')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'general' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>General</button>
             <button onClick={() => setViewMode('daily')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'daily' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Diario</button>
+            <button onClick={() => setViewMode('history')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'history' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Historial</button>
           </div>
           {viewMode === 'daily' && (
             <input type="date" className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black outline-none" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
           )}
-          <button onClick={handleAiAudit} disabled={isAiLoading} className="bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-lg disabled:opacity-50">
-            {isAiLoading ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} className="text-blue-200"/>} Auditoría IA
-          </button>
+          {viewMode !== 'history' && (
+            <button onClick={handleAiAudit} disabled={isAiLoading} className="bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-lg disabled:opacity-50">
+                {isAiLoading ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} className="text-blue-200"/>} Auditoría IA
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Ingresos Totales" amount={totalRevenue} icon={<ArrowUpCircle className="text-emerald-500"/>} rate={store.exchangeRate} />
-        <StatCard title="Compras Stock" amount={totalPurchases} icon={<ArrowDownCircle className="text-red-500"/>} rate={store.exchangeRate}/>
-        <StatCard title="Gastos Operativos" amount={totalExpenses} icon={<ArrowDownCircle className="text-orange-500"/>} rate={store.exchangeRate}/>
-        <StatCard title="Balance Neto" amount={balance} icon={<DollarSign className="text-blue-500"/>} rate={store.exchangeRate} isBalance/>
-      </div>
+      {viewMode === 'history' ? (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
+           <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div>
+                <h4 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Historial de Movimientos</h4>
+                <p className="text-xs text-slate-500 font-medium mt-1">Desglose cronológico de ingresos y egresos diarios.</p>
+              </div>
+              <div className="bg-white p-2 rounded-xl border border-slate-200 text-slate-400">
+                 <History size={20} />
+              </div>
+           </div>
+           <div className="overflow-x-auto">
+             <table className="w-full text-left">
+               <thead>
+                 <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                   <th className="px-8 py-4">Fecha</th>
+                   <th className="px-8 py-4 text-right text-emerald-600">Ingresos Totales</th>
+                   <th className="px-8 py-4 text-right text-red-500">Egresos Totales</th>
+                   <th className="px-8 py-4 text-right">Balance Neto</th>
+                   <th className="px-8 py-4 text-center">Acciones</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                 {historyData.map((day) => (
+                   <tr key={day.date} className="hover:bg-slate-50/50 transition-colors">
+                     <td className="px-8 py-5">
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+                            <Calendar size={18} />
+                         </div>
+                         <div>
+                            <p className="font-black text-slate-800 text-sm">{new Date(day.date + 'T12:00:00').toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{day.date}</p>
+                         </div>
+                       </div>
+                     </td>
+                     <td className="px-8 py-5 text-right">
+                       <p className="font-black text-emerald-600 text-sm">+${day.revenue.toFixed(2)}</p>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase">POS: ${day.pos.toFixed(2)} | Taller: ${day.workshop.toFixed(2)}</p>
+                     </td>
+                     <td className="px-8 py-5 text-right">
+                       <p className="font-black text-red-500 text-sm">-${day.expenses.toFixed(2)}</p>
+                     </td>
+                     <td className="px-8 py-5 text-right">
+                       <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-tight ${day.balance >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                         {day.balance >= 0 ? '+' : ''}${day.balance.toFixed(2)}
+                       </span>
+                     </td>
+                     <td className="px-8 py-5 text-center">
+                       <button 
+                         onClick={() => goToDate(day.date)}
+                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                         title="Ver Detalles y Auditoría IA"
+                       >
+                         <Eye size={18} />
+                       </button>
+                     </td>
+                   </tr>
+                 ))}
+                 {historyData.length === 0 && (
+                   <tr>
+                     <td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs">
+                       No hay historial registrado aún
+                     </td>
+                   </tr>
+                 )}
+               </tbody>
+             </table>
+           </div>
+        </div>
+      ) : (
+        /* Vistas General y Diario (Charts + Stats) */
+        <div className="animate-in fade-in duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard title="Ingresos Totales" amount={totalRevenue} icon={<ArrowUpCircle className="text-emerald-500"/>} rate={store.exchangeRate} />
+            <StatCard title="Compras Stock" amount={totalPurchases} icon={<ArrowDownCircle className="text-red-500"/>} rate={store.exchangeRate}/>
+            <StatCard title="Gastos Operativos" amount={totalExpenses} icon={<ArrowDownCircle className="text-orange-500"/>} rate={store.exchangeRate}/>
+            <StatCard title="Balance Neto" amount={balance} icon={<DollarSign className="text-blue-500"/>} rate={store.exchangeRate} isBalance/>
+          </div>
 
-      {aiAnalysis && (
-        <div className="bg-white p-8 rounded-[2.5rem] border border-blue-100 mb-8 shadow-xl relative overflow-hidden animate-in fade-in duration-500">
-          <h4 className="text-xs font-black text-blue-800 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-500" /> Diagnóstico Financiero Estratégico
-          </h4>
-          <div className="text-slate-600 text-sm whitespace-pre-line leading-relaxed">{aiAnalysis}</div>
+          {aiAnalysis && (
+            <div className="bg-white p-8 rounded-[2.5rem] border border-blue-100 mb-8 shadow-xl relative overflow-hidden animate-in fade-in duration-500">
+              <h4 className="text-xs font-black text-blue-800 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <Sparkles size={18} className="text-blue-500" /> Diagnóstico Financiero Estratégico
+              </h4>
+              <div className="text-slate-600 text-sm whitespace-pre-line leading-relaxed">{aiAnalysis}</div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
+              <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Flujo de Caja por Fuente</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                  <Tooltip 
+                    cursor={{fill: '#f8fafc'}} 
+                    contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold'}} 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Monto']}
+                  />
+                  <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={50} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
+              <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Desglose de Gastos</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={5} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
-          <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Flujo de Caja por Fuente</h4>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-              <Tooltip 
-                cursor={{fill: '#f8fafc'}} 
-                contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold'}} 
-                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Monto']}
-              />
-              <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={50} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-96 relative">
-          <h4 className="absolute top-8 left-8 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">Desglose de Gastos</h4>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={5} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
     </div>
   );
 };
