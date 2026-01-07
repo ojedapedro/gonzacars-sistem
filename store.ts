@@ -102,6 +102,11 @@ export const useGonzacarsStore = () => {
       if (Array.isArray(data.Inventory)) {
         setInventory(data.Inventory.map((p: any) => ({
           ...p,
+          // FIX: Asegurar que campos de texto sean string para evitar crash en búsquedas
+          id: String(p.id || Math.random().toString(36).substr(2, 9)),
+          barcode: String(p.barcode || ''),
+          name: String(p.name || ''),
+          category: String(p.category || ''),
           quantity: Number(p.quantity || 0),
           cost: Number(p.cost || 0),
           price: Number(p.price || 0)

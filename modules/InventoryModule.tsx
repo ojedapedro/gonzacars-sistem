@@ -35,11 +35,14 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
 
   // Filtered and Sorted Inventory
   const filtered = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
+    
     let result = (store.inventory || []).filter((p: Product) => {
-      const name = (p.name || '').toLowerCase();
-      const category = (p.category || '').toLowerCase();
-      const barcode = (p.barcode || '').toLowerCase();
+      // FIX CRÍTICO: Asegurar que las propiedades sean strings antes de usar toLowerCase
+      // Esto previene pantalla blanca si barcode o name vienen como números desde Sheets
+      const name = String(p.name || '').toLowerCase();
+      const category = String(p.category || '').toLowerCase();
+      const barcode = String(p.barcode || '').toLowerCase();
       
       return name.includes(term) || category.includes(term) || barcode.includes(term);
     });
