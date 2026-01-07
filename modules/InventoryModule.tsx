@@ -35,11 +35,14 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
 
   // Filtered and Sorted Inventory
   const filtered = useMemo(() => {
-    let result = (store.inventory || []).filter((p: Product) => 
-      (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.barcode?.includes(searchTerm))
-    );
+    const term = searchTerm.toLowerCase();
+    let result = (store.inventory || []).filter((p: Product) => {
+      const name = (p.name || '').toLowerCase();
+      const category = (p.category || '').toLowerCase();
+      const barcode = (p.barcode || '').toLowerCase();
+      
+      return name.includes(term) || category.includes(term) || barcode.includes(term);
+    });
 
     if (categoryFilter) {
       result = result.filter((p: Product) => p.category === categoryFilter);
