@@ -82,6 +82,18 @@ export const useGonzacarsStore = () => {
     localStorage.removeItem('gz_active_user');
   };
 
+  // Función auxiliar para limpiar strings
+  const safeString = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return String(val).trim();
+  };
+
+  // Función auxiliar para limpiar números
+  const safeNumber = (val: any): number => {
+    const num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   const refreshData = async () => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     setLoading(true);
@@ -93,79 +105,84 @@ export const useGonzacarsStore = () => {
       if (Array.isArray(data.Users)) {
         setUsers(data.Users.map((u: any) => ({
           ...u,
-          password: u.password ? String(u.password) : '' 
+          password: safeString(u.password)
         })));
       }
       
       if (Array.isArray(data.Customers)) setCustomers(data.Customers);
       
       if (Array.isArray(data.Inventory)) {
-        setInventory(data.Inventory.map((p: any) => ({
-          ...p,
-          // FIX: Asegurar que campos de texto sean string para evitar crash en búsquedas
-          id: String(p.id || Math.random().toString(36).substr(2, 9)),
-          barcode: String(p.barcode || ''),
-          name: String(p.name || ''),
-          category: String(p.category || ''),
-          quantity: Number(p.quantity || 0),
-          cost: Number(p.cost || 0),
-          price: Number(p.price || 0)
-        })));
+        setInventory(
+          data.Inventory
+            // Filtrar filas vacías (sin nombre Y sin código)
+            .filter((p: any) => safeString(p.name) || safeString(p.barcode))
+            .map((p: any) => ({
+              ...p,
+              // ID robusto: usa el existente o genera uno nuevo solo si está totalmente vacío
+              id: safeString(p.id) || Math.random().toString(36).substr(2, 9),
+              barcode: safeString(p.barcode),
+              name: safeString(p.name),
+              category: safeString(p.category),
+              quantity: safeNumber(p.quantity),
+              cost: safeNumber(p.cost),
+              price: safeNumber(p.price)
+            }))
+        );
       }
       
       if (Array.isArray(data.Repairs)) {
         setRepairs(data.Repairs.map((r: any) => ({
           ...r,
-          year: Number(r.year || 0),
-          items: (Array.isArray(r.items) ? r.items : []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) })),
-          installments: (Array.isArray(r.installments) ? r.installments : []).map((inst: any) => ({ ...inst, amount: Number(inst.amount || 0) }))
+          year: safeNumber(r.year),
+          items: (Array.isArray(r.items) ? r.items : []).map((i: any) => ({ ...i, quantity: safeNumber(i.quantity), price: safeNumber(i.price) })),
+          installments: (Array.isArray(r.installments) ? r.installments : []).map((inst: any) => ({ ...inst, amount: safeNumber(inst.amount) }))
         })));
       }
       
       if (Array.isArray(data.Sales)) {
         setSales(data.Sales.map((s: any) => ({
           ...s,
-          total: Number(s.total || 0),
-          items: (Array.isArray(s.items) ? s.items : []).map((i: any) => ({ ...i, quantity: Number(i.quantity || 0), price: Number(i.price || 0) }))
+          total: safeNumber(s.total),
+          items: (Array.isArray(s.items) ? s.items : []).map((i: any) => ({ ...i, quantity: safeNumber(i.quantity), price: safeNumber(i.price) }))
         })));
       }
       
       if (Array.isArray(data.Purchases)) {
         setPurchases(data.Purchases.map((p: any) => ({
           ...p,
-          price: Number(p.price || 0),
-          quantity: Number(p.quantity || 0),
-          total: Number(p.total || 0)
+          price: safeNumber(p.price),
+          quantity: safeNumber(p.quantity),
+          total: safeNumber(p.total)
         })));
       }
       
       if (Array.isArray(data.Expenses)) {
         setExpenses(data.Expenses.map((e: any) => ({
           ...e,
-          amount: Number(e.amount || 0)
+          amount: safeNumber(e.amount)
         })));
       }
       
       if (Array.isArray(data.Employees)) {
         setEmployees(data.Employees.map((e: any) => ({
           ...e,
-          baseSalary: Number(e.baseSalary || 0),
-          commissionRate: Number(e.commissionRate || 0)
+          baseSalary: safeNumber(e.baseSalary),
+          commissionRate: safeNumber(e.commissionRate)
         })));
       }
 
       if (Array.isArray(data.Payroll)) {
         setPayroll(data.Payroll.map((pr: any) => ({
           ...pr,
-          baseSalary: Number(pr.baseSalary || 0),
-          commission: Number(pr.commission || 0),
-          total: Number(pr.total || 0)
+          baseSalary: safeNumber(pr.baseSalary),
+          commission: safeNumber(pr.commission),
+          total: safeNumber(pr.total)
         })));
       }
       
       if (Array.isArray(data.Settings)) {
         const rateSetting = data.Settings.find((s: any) => s.key === 'exchangeRate');
-        if (rateSetting) setExchangeRate(Number(rateSetting.value));
+        if (rateSetting) setExchangeRate(safeNumber(rateSetting.value));
       }
       
     } catch (error) {
