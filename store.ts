@@ -124,6 +124,11 @@ export const useGonzacarsStore = () => {
     return parseFloat(str) || 0;
   };
 
+  // Normalizador de texto para búsquedas (quita acentos, minúsculas, espacios)
+  const normalizeText = (text: string) => {
+    return String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+
   const refreshData = async () => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     setLoading(true);
@@ -311,34 +316,59 @@ export const useGonzacarsStore = () => {
     setInventory(updatedInventory);
   };
 
-  const addPurchase = (purchase: Purchase) => {
-    setPurchases(prev => [...prev, purchase]);
-    syncRow('Purchases', 'add', purchase);
+  // --- NUEVA LÓGICA DE COMPRAS POR LOTES (CRÍTICO PARA INVENTARIO) ---
+  // Reemplaza 'addPurchase' individual para evitar condiciones de carrera en el estado
+  const registerPurchaseBatch = (newPurchases: Purchase[]) => {
+    // 1. Actualizar estado de compras
+    setPurchases(prev => [...prev, ...newPurchases]);
     
-    const existing = inventory.find(p => p.id === purchase.productId || p.name === purchase.productName);
-    if (existing) {
-      const updated = { 
-        ...existing, 
-        quantity: existing.quantity + purchase.quantity, 
-        cost: purchase.price, 
-        lastEntry: purchase.date 
-      };
-      setInventory(prev => prev.map(p => p.id === existing.id ? updated : p));
-      syncRow('Inventory', 'update', updated);
-    } else {
-      const newItem: Product = {
-        id: Math.random().toString(36).substr(2, 9),
-        barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-        name: purchase.productName,
-        category: purchase.category,
-        quantity: purchase.quantity,
-        cost: purchase.price,
-        price: purchase.price * 1.3,
-        lastEntry: purchase.date
-      };
-      setInventory(prev => [...prev, newItem]);
-      syncRow('Inventory', 'add', newItem);
-    }
+    // 2. Procesar inventario EN MEMORIA para evitar actualizaciones parciales
+    let currentInventory = [...inventory];
+    
+    newPurchases.forEach(p => {
+        // Enviar compra a Sheets
+        syncRow('Purchases', 'add', p);
+
+        // Buscar producto existente por ID o Nombre Normalizado
+        const pNameNormalized = normalizeText(p.productName);
+        
+        const existingIndex = currentInventory.findIndex(invItem => 
+           invItem.id === p.productId || 
+           normalizeText(invItem.name) === pNameNormalized ||
+           (invItem.barcode && p.productId && invItem.barcode === p.productId) // Fallback si productId es un barcode
+        );
+
+        if (existingIndex >= 0) {
+            // ACTUALIZAR EXISTENTE
+            const existingItem = currentInventory[existingIndex];
+            const updatedItem = {
+                ...existingItem,
+                quantity: existingItem.quantity + p.quantity,
+                cost: p.price, // Actualizar costo con el último precio de compra
+                lastEntry: p.date
+            };
+            // Reemplazar en el array en memoria
+            currentInventory[existingIndex] = updatedItem;
+            syncRow('Inventory', 'update', updatedItem);
+        } else {
+            // CREAR NUEVO
+            const newItem: Product = {
+                id: p.productId || Math.random().toString(36).substr(2, 9),
+                barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(), // Generar barcode temporal si no hay
+                name: p.productName,
+                category: p.category,
+                quantity: p.quantity,
+                cost: p.price,
+                price: p.price * 1.35, // Margen sugerido del 35% por defecto
+                lastEntry: p.date
+            };
+            currentInventory.push(newItem);
+            syncRow('Inventory', 'add', newItem);
+        }
+    });
+
+    // 3. Actualizar estado de inventario una sola vez
+    setInventory(currentInventory);
   };
 
   const addExpense = (expense: Expense) => {
@@ -403,7 +433,7 @@ export const useGonzacarsStore = () => {
     generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,
-    purchases, setPurchases, addPurchase,
+    purchases, setPurchases, registerPurchaseBatch, // Exponemos la nueva función
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
     payroll, setPayroll, addPayrollRecord

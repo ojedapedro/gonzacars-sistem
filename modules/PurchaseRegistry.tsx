@@ -5,6 +5,7 @@ import { Purchase, Product } from '../types';
 
 interface TemporaryItem {
   id: string;
+  productId: string; // ID real del producto si existe
   productName: string;
   category: string;
   price: number;
@@ -24,6 +25,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
 
   // Ítem actual que se está redactando
   const [currentItem, setCurrentItem] = useState<Partial<TemporaryItem>>({
+    productId: '',
     productName: '',
     category: '',
     price: 0,
@@ -46,15 +48,38 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
       alert("Complete los datos del producto correctamente.");
       return;
     }
+    
     const newItem: TemporaryItem = {
       id: Math.random().toString(36).substr(2, 9),
+      productId: currentItem.productId || '', // Preservar ID si se seleccionó de la lista
       productName: currentItem.productName || '',
       category: currentItem.category || '',
-      price: currentItem.price || 0,
-      quantity: currentItem.quantity || 1
+      price: Number(currentItem.price) || 0,
+      quantity: Number(currentItem.quantity) || 1
     };
+    
     setInvoiceItems([...invoiceItems, newItem]);
-    setCurrentItem({ productName: '', category: '', price: 0, quantity: 1 });
+    setCurrentItem({ productId: '', productName: '', category: '', price: 0, quantity: 1 });
+  };
+
+  const handleProductSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCurrentItem(prev => ({ ...prev, productName: val }));
+    
+    // Buscar si existe en inventario
+    const existing = store.inventory.find((p: Product) => p.name === val);
+    if (existing) {
+        setCurrentItem(prev => ({
+            ...prev,
+            productName: existing.name,
+            productId: existing.id,
+            category: existing.category,
+            price: existing.cost // Sugerir último costo
+        }));
+    } else {
+        // Si no existe o se cambió el nombre, resetear ID
+        setCurrentItem(prev => ({ ...prev, productId: '' }));
+    }
   };
 
   const removeItemFromInvoice = (id: string) => {
@@ -69,14 +94,14 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
 
     const invoiceId = Math.random().toString(36).substr(2, 9).toUpperCase();
     
-    invoiceItems.forEach(item => {
-      const purchaseRecord: Purchase = {
+    // Preparar el lote de compras
+    const purchasesBatch: Purchase[] = invoiceItems.map(item => ({
         id: Math.random().toString(36).substr(2, 9),
         invoiceId,
         date: invoiceHeader.date,
         provider: invoiceHeader.provider,
         invoiceNumber: invoiceHeader.invoiceNumber,
-        productId: '', // Se genera o vincula en el store
+        productId: item.productId, // Pasar el ID vinculado si existe
         productName: item.productName,
         category: item.category,
         price: item.price,
@@ -84,9 +109,10 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
         total: item.price * item.quantity,
         type: invoiceHeader.type,
         status: status
-      };
-      store.addPurchase(purchaseRecord);
-    });
+    }));
+
+    // Enviar lote completo al store para procesamiento atómico
+    store.registerPurchaseBatch(purchasesBatch);
 
     alert(`Factura ${status} registrada con éxito. El inventario ha sido actualizado.`);
     
@@ -113,7 +139,10 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
   }, [store.purchases, filters]);
 
   const invoiceTotal = invoiceItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const categories = Array.from(new Set(store.purchases.map((p: Purchase) => p.category))) as string[];
+  
+  // Sugerencias de categorías y productos
+  const categories = Array.from(new Set(store.inventory.map((p: Product) => p.category))) as string[];
+  const existingProducts = store.inventory as Product[];
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
@@ -177,7 +206,17 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-slate-50 p-6 rounded-3xl border border-slate-100">
                 <div className="md:col-span-4 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Repuesto</label>
-                  <input type="text" placeholder="Bujías NGK..." className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" value={currentItem.productName} onChange={(e) => setCurrentItem({...currentItem, productName: e.target.value})} />
+                  <input 
+                    type="text" 
+                    list="existingProducts" 
+                    placeholder="Escriba para buscar..." 
+                    className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" 
+                    value={currentItem.productName} 
+                    onChange={handleProductSelect} 
+                  />
+                  <datalist id="existingProducts">
+                    {existingProducts.map(p => <option key={p.id} value={p.name} />)}
+                  </datalist>
                 </div>
                 <div className="md:col-span-3 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
@@ -187,7 +226,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                   </datalist>
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Costo ($)</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Costo Unit. ($)</label>
                   <input type="number" step="0.01" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none" value={currentItem.price || ''} onChange={(e) => setCurrentItem({...currentItem, price: Number(e.target.value)})} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
@@ -209,7 +248,10 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                         <Package size={18}/>
                       </div>
                       <div>
-                        <p className="font-black text-slate-800 text-sm uppercase tracking-tight">{item.productName}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="font-black text-slate-800 text-sm uppercase tracking-tight">{item.productName}</p>
+                            {item.productId && <span className="bg-emerald-100 text-emerald-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Vinculado</span>}
+                        </div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category} • Cant: {item.quantity}</p>
                       </div>
                     </div>
@@ -279,7 +321,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                   <CheckCircle size={20}/> Procesar y Cerrar
                 </button>
               </div>
-              <p className="text-[9px] text-slate-400 font-medium italic text-center px-4">Al cerrar la factura, los ítems se marcarán como pagados y el historial se actualizará.</p>
+              <p className="text-[9px] text-slate-400 font-medium italic text-center px-4">Al cerrar la factura, los ítems se sumarán al inventario automáticamente.</p>
             </div>
           </div>
         </div>
