@@ -82,16 +82,46 @@ export const useGonzacarsStore = () => {
     localStorage.removeItem('gz_active_user');
   };
 
-  // Función auxiliar para limpiar strings
+  // --- HELPER FUNCTIONS ROBUSTAS ---
+
+  // Busca el valor de una propiedad probando múltiples nombres de llave (case-insensitive)
+  const getVal = (item: any, possibleKeys: string[]): any => {
+    if (!item || typeof item !== 'object') return undefined;
+    
+    // 1. Búsqueda exacta primero
+    for (const key of possibleKeys) {
+      if (item[key] !== undefined && item[key] !== null && item[key] !== '') return item[key];
+    }
+
+    // 2. Búsqueda case-insensitive
+    const objectKeys = Object.keys(item);
+    for (const key of possibleKeys) {
+      const foundKey = objectKeys.find(k => k.toLowerCase() === key.toLowerCase());
+      if (foundKey && item[foundKey] !== undefined && item[foundKey] !== null && item[foundKey] !== '') {
+        return item[foundKey];
+      }
+    }
+    return undefined;
+  };
+
   const safeString = (val: any): string => {
     if (val === null || val === undefined) return '';
     return String(val).trim();
   };
 
-  // Función auxiliar para limpiar números
   const safeNumber = (val: any): number => {
-    const num = parseFloat(val);
-    return isNaN(num) ? 0 : num;
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    
+    // Limpiar string de símbolos de moneda y convertir comas a puntos si es necesario
+    const str = String(val).replace(/[$ Bs]/g, '').trim(); 
+    
+    // Si tiene coma y no punto, asumimos formato decimal español (10,50)
+    if (str.includes(',') && !str.includes('.')) {
+      return parseFloat(str.replace(',', '.')) || 0;
+    }
+    
+    return parseFloat(str) || 0;
   };
 
   const refreshData = async () => {
@@ -102,34 +132,49 @@ export const useGonzacarsStore = () => {
       if (!response.ok) throw new Error("Error en red");
       const data = await response.json();
       
+      // Mapeo flexible para Usuarios
       if (Array.isArray(data.Users)) {
         setUsers(data.Users.map((u: any) => ({
           ...u,
-          password: safeString(u.password)
+          id: safeString(getVal(u, ['id', 'ID', 'Id'])),
+          username: safeString(getVal(u, ['username', 'usuario', 'user'])),
+          password: safeString(getVal(u, ['password', 'clave', 'pass'])),
+          name: safeString(getVal(u, ['name', 'nombre'])),
+          role: safeString(getVal(u, ['role', 'rol', 'cargo']))
         })));
       }
       
       if (Array.isArray(data.Customers)) setCustomers(data.Customers);
       
+      // Mapeo INTELIGENTE para Inventario
       if (Array.isArray(data.Inventory)) {
-        setInventory(
-          data.Inventory
-            // Filtrar filas vacías (sin nombre Y sin código)
-            .filter((p: any) => safeString(p.name) || safeString(p.barcode))
-            .map((p: any) => ({
-              ...p,
-              // ID robusto: usa el existente o genera uno nuevo solo si está totalmente vacío
-              id: safeString(p.id) || Math.random().toString(36).substr(2, 9),
-              barcode: safeString(p.barcode),
-              name: safeString(p.name),
-              category: safeString(p.category),
-              quantity: safeNumber(p.quantity),
-              cost: safeNumber(p.cost),
-              price: safeNumber(p.price)
-            }))
-        );
+        const mappedInventory = data.Inventory.map((p: any) => {
+          // Intentar recuperar valores con múltiples nombres de columna posibles
+          const rawName = getVal(p, ['name', 'nombre', 'producto', 'product', 'descripcion']);
+          const rawBarcode = getVal(p, ['barcode', 'codigo', 'code', 'id', 'referencia']);
+          const rawCategory = getVal(p, ['category', 'categoria', 'cat', 'rubro']);
+          const rawQty = getVal(p, ['quantity', 'cantidad', 'stock', 'cant', 'existencia']);
+          const rawCost = getVal(p, ['cost', 'costo', 'compra']);
+          const rawPrice = getVal(p, ['price', 'precio', 'venta', 'pvp']);
+          const rawId = getVal(p, ['id', 'ID', 'uuid']);
+
+          return {
+            ...p,
+            id: safeString(rawId) || Math.random().toString(36).substr(2, 9),
+            barcode: safeString(rawBarcode),
+            name: safeString(rawName),
+            category: safeString(rawCategory) || 'General',
+            quantity: safeNumber(rawQty),
+            cost: safeNumber(rawCost),
+            price: safeNumber(rawPrice)
+          };
+        });
+
+        // Filtrar solo los productos que tengan al menos Nombre o Código válidos
+        setInventory(mappedInventory.filter((p: Product) => p.name.length > 0 || p.barcode.length > 0));
       }
       
+      // Repairs, Sales, etc. mantienen lógica similar pero Inventory es el crítico
       if (Array.isArray(data.Repairs)) {
         setRepairs(data.Repairs.map((r: any) => ({
           ...r,
@@ -181,8 +226,14 @@ export const useGonzacarsStore = () => {
       }
       
       if (Array.isArray(data.Settings)) {
-        const rateSetting = data.Settings.find((s: any) => s.key === 'exchangeRate');
-        if (rateSetting) setExchangeRate(safeNumber(rateSetting.value));
+        const rateSetting = data.Settings.find((s: any) => {
+           const k = getVal(s, ['key', 'clave', 'parametro']);
+           return k === 'exchangeRate';
+        });
+        if (rateSetting) {
+            const val = getVal(rateSetting, ['value', 'valor']);
+            setExchangeRate(safeNumber(val));
+        }
       }
       
     } catch (error) {
