@@ -405,6 +405,15 @@ export const useGonzacarsStore = () => {
     }
   };
 
+  const updateProductName = (id: string, name: string) => {
+    const item = inventory.find(p => p.id === id);
+    if (item) {
+        const updated = { ...item, name };
+        setInventory(inventory.map(p => p.id === id ? updated : p));
+        syncRow('Inventory', 'update', updated);
+    }
+  };
+
   const updateInventoryQuantity = (id: string, newQuantity: number) => {
     const item = inventory.find(p => p.id === id);
     if (item) {
@@ -429,7 +438,7 @@ export const useGonzacarsStore = () => {
     users, addUser, updateUser, deleteUser,
     exchangeRate, setExchangeRate: updateExchangeRate,
     customers, addCustomer,
-    inventory, setInventory, updateInventoryPrice, updateInventoryQuantity, updateBarcode, 
+    inventory, setInventory, updateInventoryPrice, updateProductName, updateInventoryQuantity, updateBarcode, 
     generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,

@@ -7,8 +7,10 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingBarcodeId, setEditingBarcodeId] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null); // State for editing name
   const [newPrice, setNewPrice] = useState(0);
   const [newBarcode, setNewBarcode] = useState('');
+  const [newName, setNewName] = useState(''); // State for new name value
   
   // Filtering & Sorting States
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -97,6 +99,13 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const handleBarcodeUpdate = (id: string) => {
     store.updateBarcode(id, newBarcode);
     setEditingBarcodeId(null);
+  };
+
+  const handleNameUpdate = (id: string) => {
+    if (newName.trim()) {
+      store.updateProductName(id, newName);
+    }
+    setEditingNameId(null);
   };
 
   const regenerateBarcode = (id: string) => {
@@ -284,8 +293,24 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                   )}
                 </td>
                 <td className="px-8 py-5">
-                  <div className="font-black text-slate-800 uppercase text-sm tracking-tight">{p.name}</div>
-                  <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{p.category}</div>
+                  {editingNameId === p.id ? (
+                    <input 
+                      className="w-full text-sm font-black text-slate-800 uppercase p-2 border border-blue-200 rounded-lg outline-none"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onBlur={() => handleNameUpdate(p.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNameUpdate(p.id)}
+                      autoFocus
+                    />
+                  ) : (
+                    <div className="group/name cursor-pointer" onClick={() => { setEditingNameId(p.id); setNewName(p.name); }}>
+                       <div className="flex items-center gap-2">
+                         <div className="font-black text-slate-800 uppercase text-sm tracking-tight">{p.name}</div>
+                         <Edit3 size={12} className="text-slate-300 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                       </div>
+                       <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{p.category}</div>
+                    </div>
+                  )}
                 </td>
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-center gap-2">
