@@ -422,6 +422,22 @@ export const useGonzacarsStore = () => {
         syncRow('Inventory', 'update', updated);
     }
   };
+  
+  // Update multiple stock items efficiently
+  const updateStockBatch = (updates: { id: string; quantity: number }[]) => {
+    const currentInventory = [...inventory];
+    
+    updates.forEach(update => {
+        const index = currentInventory.findIndex(p => p.id === update.id);
+        if (index > -1) {
+            const updatedItem = { ...currentInventory[index], quantity: update.quantity };
+            currentInventory[index] = updatedItem;
+            syncRow('Inventory', 'update', updatedItem);
+        }
+    });
+    
+    setInventory(currentInventory);
+  };
 
   const updateBarcode = (id: string, barcode: string) => {
     const item = inventory.find(p => p.id === id);
@@ -438,7 +454,7 @@ export const useGonzacarsStore = () => {
     users, addUser, updateUser, deleteUser,
     exchangeRate, setExchangeRate: updateExchangeRate,
     customers, addCustomer,
-    inventory, setInventory, updateInventoryPrice, updateProductName, updateInventoryQuantity, updateBarcode, 
+    inventory, setInventory, updateInventoryPrice, updateProductName, updateInventoryQuantity, updateStockBatch, updateBarcode, 
     generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,

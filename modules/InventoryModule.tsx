@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle } from 'lucide-react';
 import { Product, Purchase, Sale } from '../types';
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
@@ -25,6 +25,11 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   // Audit Form State
   const [physicalCount, setPhysicalCount] = useState<number>(0);
   const [auditReason, setAuditReason] = useState('');
+
+  // Bulk Import States
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkPreview, setBulkPreview] = useState<{product: Product, newQuantity: number}[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derived Data for Filters
   const categories = useMemo(() => 
@@ -135,6 +140,62 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     setShowAuditModal(false);
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        const lines = text.split('\n');
+        const updates: {product: Product, newQuantity: number}[] = [];
+
+        // Skip header if present (simple heuristic: if first col is not a number/code but string 'barcode' or 'id')
+        const startIndex = lines[0].toLowerCase().includes('barcode') || lines[0].toLowerCase().includes('cantidad') ? 1 : 0;
+
+        for (let i = startIndex; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Expected CSV format: barcode,quantity
+            // OR name,quantity (fallback)
+            const parts = line.split(',');
+            if (parts.length < 2) continue;
+
+            const identifier = parts[0].trim().replace(/['"]/g, '');
+            const quantity = Number(parts[1].trim());
+
+            if (isNaN(quantity)) continue;
+
+            // Try to find product by barcode first, then name
+            const product = store.inventory.find((p: Product) => 
+                String(p.barcode) === identifier || 
+                p.name.toLowerCase() === identifier.toLowerCase()
+            );
+
+            if (product) {
+                updates.push({ product, newQuantity: quantity });
+            }
+        }
+        setBulkPreview(updates);
+    };
+    reader.readAsText(file);
+  };
+
+  const processBulkUpdate = () => {
+    if (bulkPreview.length === 0) return;
+    
+    const updates = bulkPreview.map(item => ({
+        id: item.product.id,
+        quantity: item.newQuantity
+    }));
+
+    store.updateStockBatch(updates);
+    alert(`${updates.length} productos actualizados correctamente.`);
+    setShowBulkModal(false);
+    setBulkPreview([]);
+  };
+
   // KARDEX LOGIC: Combine Purchases (Entries) and Sales (Exits)
   const getProductMovements = (product: Product) => {
     const movements: any[] = [];
@@ -189,6 +250,12 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-slate-500 font-medium">Gestión de stock, precios y auditoría de abastecimiento</p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
+          <button 
+             onClick={() => setShowBulkModal(true)}
+             className="bg-emerald-600 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+          >
+             <FileSpreadsheet size={18}/> Carga Masiva (CSV)
+          </button>
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
             <input 
@@ -386,6 +453,97 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
           </div>
         )}
       </div>
+
+      {/* MODAL BULK IMPORT */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in duration-300">
+             <div className="p-8 bg-slate-950 text-white flex justify-between items-start">
+                <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
+                     <FileSpreadsheet className="text-emerald-500" /> Carga Masiva de Stock
+                  </h3>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Importar inventario físico desde CSV</p>
+                </div>
+                <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                   <X size={24} />
+                </button>
+             </div>
+
+             <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+                {bulkPreview.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 border-4 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                        <UploadCloud size={64} className="text-slate-300 mb-4" />
+                        <h4 className="text-lg font-black text-slate-700 uppercase">Subir Archivo .CSV</h4>
+                        <p className="text-xs text-slate-400 font-medium mb-6">Formato requerido: Código de Barras, Cantidad</p>
+                        <input 
+                            type="file" 
+                            accept=".csv"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-lg"
+                        >
+                            Seleccionar Archivo
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                            <div className="flex items-center gap-3 text-emerald-700">
+                                <CheckCircle size={20} />
+                                <span className="font-bold text-sm">Se encontraron {bulkPreview.length} productos válidos</span>
+                            </div>
+                            <button onClick={() => setBulkPreview([])} className="text-xs font-black uppercase text-emerald-600 hover:text-emerald-800">
+                                Cambiar Archivo
+                            </button>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-4 py-3 font-black text-slate-500 uppercase">Producto</th>
+                                        <th className="px-4 py-3 font-black text-slate-500 uppercase text-center">Stock Actual</th>
+                                        <th className="px-4 py-3 font-black text-slate-500 uppercase text-center">Nuevo Stock</th>
+                                        <th className="px-4 py-3 font-black text-slate-500 uppercase text-right">Diferencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {bulkPreview.map((item, idx) => {
+                                        const diff = item.newQuantity - item.product.quantity;
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="px-4 py-3 font-bold text-slate-700 truncate max-w-[200px]">{item.product.name}</td>
+                                                <td className="px-4 py-3 text-center text-slate-500">{item.product.quantity}</td>
+                                                <td className="px-4 py-3 text-center font-black text-blue-600">{item.newQuantity}</td>
+                                                <td className={`px-4 py-3 text-right font-bold ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                                    {diff > 0 ? '+' : ''}{diff}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+             </div>
+
+             {bulkPreview.length > 0 && (
+                 <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-4">
+                     <button onClick={() => setBulkPreview([])} className="flex-1 py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-600">Cancelar</button>
+                     <button onClick={processBulkUpdate} className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black shadow-xl">
+                         Confirmar Actualización Masiva
+                     </button>
+                 </div>
+             )}
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE HISTORIAL (KARDEX) */}
       {showHistoryModal && selectedProduct && (
