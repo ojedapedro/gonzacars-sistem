@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { Purchase, Product } from '../types';
 
 interface TemporaryItem {
@@ -14,6 +14,7 @@ interface TemporaryItem {
 
 const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
   const [activeTab, setActiveTab] = useState<'register' | 'history'>('register');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Datos del Encabezado (Proveedor y Factura)
   const [invoiceHeader, setInvoiceHeader] = useState({
@@ -87,12 +88,13 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
     setInvoiceItems(invoiceItems.filter(item => item.id !== id));
   };
 
-  const processInvoice = (status: 'Pendiente' | 'Cerrada') => {
+  const processInvoice = async (status: 'Pendiente' | 'Cerrada') => {
     if (!invoiceHeader.provider || !invoiceHeader.invoiceNumber || invoiceItems.length === 0) {
       alert("Debe completar el encabezado y añadir al menos un producto.");
       return;
     }
 
+    setIsSaving(true);
     const invoiceId = Math.random().toString(36).substr(2, 9).toUpperCase();
     
     // Preparar el lote de compras
@@ -112,20 +114,27 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
         status: status
     }));
 
-    // Enviar lote completo al store para procesamiento atómico
-    store.registerPurchaseBatch(purchasesBatch);
+    try {
+        // Enviar lote completo al store para procesamiento secuencial
+        await store.registerPurchaseBatch(purchasesBatch);
 
-    alert(`Factura ${status} registrada con éxito. El inventario ha sido actualizado.`);
-    
-    // Resetear formulario
-    setInvoiceHeader({
-      date: new Date().toISOString().split('T')[0],
-      provider: '',
-      invoiceNumber: '',
-      type: 'Contado'
-    });
-    setInvoiceItems([]);
-    if (status === 'Cerrada') setActiveTab('history');
+        alert(`Factura ${status} registrada con éxito. Se han procesado ${purchasesBatch.length} items y actualizado el inventario.`);
+        
+        // Resetear formulario
+        setInvoiceHeader({
+          date: new Date().toISOString().split('T')[0],
+          provider: '',
+          invoiceNumber: '',
+          type: 'Contado'
+        });
+        setInvoiceItems([]);
+        if (status === 'Cerrada') setActiveTab('history');
+    } catch (error) {
+        alert("Ocurrió un error al procesar algunos items. Por favor verifique el historial.");
+        console.error(error);
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   // Filtrado de Historial Avanzado
@@ -155,12 +164,14 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
         <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
           <button 
             onClick={() => setActiveTab('register')}
+            disabled={isSaving}
             className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'register' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Nueva Factura
           </button>
           <button 
             onClick={() => setActiveTab('history')}
+            disabled={isSaving}
             className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Historial de Facturas
@@ -181,7 +192,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Proveedor / Razón Social</label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                    <input required type="text" placeholder="Ej: Repuestos El Chamo C.A." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={invoiceHeader.provider} onChange={(e) => setInvoiceHeader({...invoiceHeader, provider: e.target.value})} />
+                    <input required type="text" placeholder="Ej: Repuestos El Chamo C.A." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={invoiceHeader.provider} onChange={(e) => setInvoiceHeader({...invoiceHeader, provider: e.target.value})} disabled={isSaving} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -189,12 +200,12 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nro. Factura</label>
                     <div className="relative">
                       <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                      <input required type="text" placeholder="000123" className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={invoiceHeader.invoiceNumber} onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNumber: e.target.value})} />
+                      <input required type="text" placeholder="000123" className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={invoiceHeader.invoiceNumber} onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNumber: e.target.value})} disabled={isSaving} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Fecha</label>
-                    <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none" value={invoiceHeader.date} onChange={(e) => setInvoiceHeader({...invoiceHeader, date: e.target.value})} />
+                    <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none" value={invoiceHeader.date} onChange={(e) => setInvoiceHeader({...invoiceHeader, date: e.target.value})} disabled={isSaving} />
                   </div>
                 </div>
               </div>
@@ -214,6 +225,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                     className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" 
                     value={currentItem.productName} 
                     onChange={handleProductSelect} 
+                    disabled={isSaving}
                   />
                   <datalist id="existingProducts">
                     {existingProducts.map(p => <option key={p.id} value={p.name} />)}
@@ -221,21 +233,21 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                 </div>
                 <div className="md:col-span-3 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
-                  <input type="text" list="categories" placeholder="Motor..." className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" value={currentItem.category} onChange={(e) => setCurrentItem({...currentItem, category: e.target.value})} />
+                  <input type="text" list="categories" placeholder="Motor..." className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-bold outline-none" value={currentItem.category} onChange={(e) => setCurrentItem({...currentItem, category: e.target.value})} disabled={isSaving} />
                   <datalist id="categories">
                     {categories.map(c => <option key={c} value={c} />)}
                   </datalist>
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Costo Unit. ($)</label>
-                  <input type="number" step="0.01" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none" value={currentItem.price || ''} onChange={(e) => setCurrentItem({...currentItem, price: Number(e.target.value)})} />
+                  <input type="number" step="0.01" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none" value={currentItem.price || ''} onChange={(e) => setCurrentItem({...currentItem, price: Number(e.target.value)})} disabled={isSaving} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cant.</label>
-                  <input type="number" className="w-full px-2 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none text-center" value={currentItem.quantity || ''} onChange={(e) => setCurrentItem({...currentItem, quantity: Number(e.target.value)})} />
+                  <input type="number" className="w-full px-2 py-2.5 bg-white border border-slate-100 rounded-xl font-black outline-none text-center" value={currentItem.quantity || ''} onChange={(e) => setCurrentItem({...currentItem, quantity: Number(e.target.value)})} disabled={isSaving} />
                 </div>
                 <div className="md:col-span-1">
-                  <button onClick={addItemToInvoice} className="w-full h-[46px] bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                  <button onClick={addItemToInvoice} disabled={isSaving} className="w-full h-[46px] bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50">
                     <Plus size={20}/>
                   </button>
                 </div>
@@ -261,7 +273,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                         <p className="font-black text-slate-900">${(item.price * item.quantity).toFixed(2)}</p>
                         <p className="text-[9px] font-bold text-slate-400 uppercase italic">@ ${item.price.toFixed(2)}</p>
                       </div>
-                      <button onClick={() => removeItemFromInvoice(item.id)} className="text-slate-300 hover:text-red-500 transition-colors p-2">
+                      <button onClick={() => removeItemFromInvoice(item.id)} disabled={isSaving} className="text-slate-300 hover:text-red-500 transition-colors p-2 disabled:opacity-30">
                         <Trash2 size={18}/>
                       </button>
                     </div>
@@ -300,7 +312,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
             <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Forma de Pago</label>
-                <select className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest outline-none appearance-none cursor-pointer" value={invoiceHeader.type} onChange={(e) => setInvoiceHeader({...invoiceHeader, type: e.target.value as 'Contado' | 'Crédito'})}>
+                <select className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest outline-none appearance-none cursor-pointer" value={invoiceHeader.type} onChange={(e) => setInvoiceHeader({...invoiceHeader, type: e.target.value as 'Contado' | 'Crédito'})} disabled={isSaving}>
                   <option value="Contado">Pago Inmediato (Contado)</option>
                   <option value="Crédito">Compra a Crédito</option>
                 </select>
@@ -308,21 +320,27 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
               
               <div className="flex flex-col gap-3 pt-4">
                 <button 
-                  disabled={invoiceItems.length === 0}
+                  disabled={invoiceItems.length === 0 || isSaving}
                   onClick={() => processInvoice('Pendiente')}
                   className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-all disabled:opacity-50"
                 >
-                  <Clock size={16}/> Guardar como Pendiente
+                  {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Clock size={16}/>} 
+                  {isSaving ? 'Procesando...' : 'Guardar como Pendiente'}
                 </button>
                 <button 
-                  disabled={invoiceItems.length === 0}
+                  disabled={invoiceItems.length === 0 || isSaving}
                   onClick={() => processInvoice('Cerrada')}
                   className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition-all disabled:opacity-50 active:scale-95"
                 >
-                  <CheckCircle size={20}/> Procesar y Cerrar
+                  {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle size={20}/>} 
+                  {isSaving ? 'Guardando (No cerrar)...' : 'Procesar y Cerrar'}
                 </button>
               </div>
-              <p className="text-[9px] text-slate-400 font-medium italic text-center px-4">Al cerrar la factura, los ítems se sumarán al inventario automáticamente.</p>
+              <p className="text-[9px] text-slate-400 font-medium italic text-center px-4">
+                {isSaving 
+                  ? "Por favor espere. Estamos registrando los productos uno por uno para asegurar la integridad de la base de datos." 
+                  : "Al cerrar la factura, los ítems se sumarán al inventario automáticamente."}
+              </p>
             </div>
           </div>
         </div>

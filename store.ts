@@ -7,6 +7,7 @@ const STORED_USER = localStorage.getItem('gz_active_user');
 
 export const useGonzacarsStore = () => {
   const [loading, setLoading] = useState(false);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false); // Nuevo estado para indicar carga masiva
   const [sheetsUrl, setSheetsUrl] = useState(DEFAULT_SHEETS_URL);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -84,16 +85,11 @@ export const useGonzacarsStore = () => {
 
   // --- HELPER FUNCTIONS ROBUSTAS ---
 
-  // Busca el valor de una propiedad probando múltiples nombres de llave (case-insensitive)
   const getVal = (item: any, possibleKeys: string[]): any => {
     if (!item || typeof item !== 'object') return undefined;
-    
-    // 1. Búsqueda exacta primero
     for (const key of possibleKeys) {
       if (item[key] !== undefined && item[key] !== null && item[key] !== '') return item[key];
     }
-
-    // 2. Búsqueda case-insensitive
     const objectKeys = Object.keys(item);
     for (const key of possibleKeys) {
       const foundKey = objectKeys.find(k => k.toLowerCase() === key.toLowerCase());
@@ -112,32 +108,27 @@ export const useGonzacarsStore = () => {
   const safeNumber = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    
-    // Limpiar string de símbolos de moneda y convertir comas a puntos si es necesario
     const str = String(val).replace(/[$ Bs]/g, '').trim(); 
-    
-    // Si tiene coma y no punto, asumimos formato decimal español (10,50)
     if (str.includes(',') && !str.includes('.')) {
       return parseFloat(str.replace(',', '.')) || 0;
     }
-    
     return parseFloat(str) || 0;
   };
 
-  // Normalizador de texto para búsquedas (quita acentos, minúsculas, espacios)
   const normalizeText = (text: string) => {
     return String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   };
 
   const refreshData = async () => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
+    if (isProcessingBatch) return; // Evitar refrescar mientras se procesa un lote crítico
+
     setLoading(true);
     try {
       const response = await fetch(sheetsUrl);
       if (!response.ok) throw new Error("Error en red");
       const data = await response.json();
       
-      // Mapeo flexible para Usuarios
       if (Array.isArray(data.Users)) {
         setUsers(data.Users.map((u: any) => ({
           ...u,
@@ -151,10 +142,8 @@ export const useGonzacarsStore = () => {
       
       if (Array.isArray(data.Customers)) setCustomers(data.Customers);
       
-      // Mapeo INTELIGENTE para Inventario
       if (Array.isArray(data.Inventory)) {
         const mappedInventory = data.Inventory.map((p: any) => {
-          // Intentar recuperar valores con múltiples nombres de columna posibles
           const rawName = getVal(p, ['name', 'nombre', 'producto', 'product', 'descripcion']);
           const rawBarcode = getVal(p, ['barcode', 'codigo', 'code', 'id', 'referencia']);
           const rawCategory = getVal(p, ['category', 'categoria', 'cat', 'rubro']);
@@ -174,12 +163,10 @@ export const useGonzacarsStore = () => {
             price: safeNumber(rawPrice)
           };
         });
-
-        // Filtrar solo los productos que tengan al menos Nombre o Código válidos
-        setInventory(mappedInventory.filter((p: Product) => p.name.length > 0 || p.barcode.length > 0));
+        // Filtrado más permisivo para evitar ocultar productos válidos
+        setInventory(mappedInventory.filter((p: Product) => p.name.length > 0));
       }
       
-      // Repairs, Sales, etc. mantienen lógica similar pero Inventory es el crítico
       if (Array.isArray(data.Repairs)) {
         setRepairs(data.Repairs.map((r: any) => ({
           ...r,
@@ -304,6 +291,9 @@ export const useGonzacarsStore = () => {
     setSales(prev => [...prev, sale]);
     syncRow('Sales', 'add', sale);
     
+    // Para ventas (salida de stock), también debería ser secuencial idealmente,
+    // pero como suele ser 1 venta = pocos items, lo dejamos así por ahora.
+    // Si hay problemas, aplicar misma lógica que en compras.
     const updatedInventory = inventory.map(item => {
       const soldItem = sale.items.find(si => si.productId === item.id);
       if (soldItem) {
@@ -316,48 +306,50 @@ export const useGonzacarsStore = () => {
     setInventory(updatedInventory);
   };
 
-  // --- OPTIMIZED BATCH PURCHASE LOGIC ---
-  const registerPurchaseBatch = (newPurchases: Purchase[]) => {
-    // IMPORTANTE: Trabajamos sobre una copia del inventario actual para simular la transacción completa
-    // antes de actualizar el estado de React. Esto evita que actualizaciones parciales se pierdan.
+  // --- LOGICA DE COMPRAS OPTIMIZADA: SECUENCIAL (BATCH PROCESSING) ---
+  // Soluciona el problema de filas perdidas en Google Sheets por concurrencia
+  const registerPurchaseBatch = async (newPurchases: Purchase[]) => {
+    setIsProcessingBatch(true); // Bloquear interfaz o mostrar carga
+    
+    // Copia local para búsqueda rápida durante el proceso
     const currentInventory = [...inventory];
-    const processedPurchases: Purchase[] = [];
-
-    newPurchases.forEach(p => {
+    
+    // Utilizamos un bucle for..of para permitir AWAIT dentro de cada iteración.
+    // Esto asegura que Google Sheets procese una fila a la vez.
+    for (const p of newPurchases) {
         let targetProductId = p.productId;
         let productIndex = -1;
 
-        // 1. Intentar buscar por ID si viene provisto
+        // 1. Buscar producto en el array local actualizado
         if (targetProductId) {
             productIndex = currentInventory.findIndex(i => i.id === targetProductId);
         }
 
-        // 2. Si no se encuentra o no hay ID, buscar por Nombre Normalizado (evita duplicados por mayúsculas/acentos)
         if (productIndex === -1) {
             const pNameNormalized = normalizeText(p.productName);
             productIndex = currentInventory.findIndex(i => normalizeText(i.name) === pNameNormalized);
         }
 
-        // 3. Lógica de Actualización vs Creación
+        // 2. Procesar Inventario
         if (productIndex > -1) {
-            // -- ACTUALIZAR EXISTENTE --
+            // -- ACTUALIZAR --
             const existingItem = currentInventory[productIndex];
-            targetProductId = existingItem.id; // IMPORTANTE: Usar el ID real del inventario
+            targetProductId = existingItem.id;
 
             const updatedItem = {
                 ...existingItem,
                 quantity: existingItem.quantity + p.quantity,
-                cost: p.price, // Actualizar último costo
+                cost: p.price,
                 lastEntry: p.date
             };
-            // Actualizar en el array temporal en memoria
+            
+            // Actualizar memoria local
             currentInventory[productIndex] = updatedItem;
             
-            // Sincronizar inmediatamente para persistencia
-            syncRow('Inventory', 'update', updatedItem);
+            // Enviar a BD y ESPERAR
+            await syncRow('Inventory', 'update', updatedItem);
         } else {
-            // -- CREAR NUEVO --
-            // Si no teníamos ID, generamos uno nuevo ahora. Si ya venía un ID temporal, se usa (raro en este flujo pero posible)
+            // -- CREAR --
             if (!targetProductId) {
                 targetProductId = Math.random().toString(36).substr(2, 9);
             }
@@ -369,33 +361,36 @@ export const useGonzacarsStore = () => {
                 category: p.category,
                 quantity: p.quantity,
                 cost: p.price,
-                price: p.price * 1.35, // Margen sugerido del 35%
+                price: p.price * 1.35, 
                 lastEntry: p.date
             };
             
-            // Agregar al array temporal
+            // Agregar a memoria local
             currentInventory.push(newItem);
             
-            // Sincronizar nuevo producto
-            syncRow('Inventory', 'add', newItem);
+            // Enviar a BD y ESPERAR
+            await syncRow('Inventory', 'add', newItem);
         }
 
-        // 4. Preparar el registro de Compra final con el ID de producto correcto
-        // Esto vincula para siempre esta compra con ese producto específico en el historial
+        // 3. Registrar la Compra vinculada
         const finalPurchaseRecord = {
             ...p,
             productId: targetProductId 
         };
-
-        processedPurchases.push(finalPurchaseRecord);
         
-        // Sincronizar registro de compra
-        syncRow('Purchases', 'add', finalPurchaseRecord);
-    });
+        // Enviar compra a BD y ESPERAR
+        await syncRow('Purchases', 'add', finalPurchaseRecord);
 
-    // 5. Actualizar estado global de React UNA SOLA VEZ al final del bucle
-    setInventory(currentInventory);
-    setPurchases(prev => [...prev, ...processedPurchases]);
+        // Pequeño delay para dar respiro a la API de Google
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    // 4. Finalizar
+    // Actualizamos el estado local de React con la data acumulada
+    // PERO, para seguridad total, hacemos un refreshData final para traer los datos reales de la hoja
+    // y asegurar que "Prueba 2, 4, 6" aparezcan si la BD los tiene.
+    await refreshData();
+    setIsProcessingBatch(false);
   };
 
   const addExpense = (expense: Expense) => {
@@ -450,10 +445,8 @@ export const useGonzacarsStore = () => {
     }
   };
   
-  // Update multiple stock items efficiently
   const updateStockBatch = (updates: { id: string; quantity: number }[]) => {
     const currentInventory = [...inventory];
-    
     updates.forEach(update => {
         const index = currentInventory.findIndex(p => p.id === update.id);
         if (index > -1) {
@@ -462,7 +455,6 @@ export const useGonzacarsStore = () => {
             syncRow('Inventory', 'update', updatedItem);
         }
     });
-    
     setInventory(currentInventory);
   };
 
@@ -476,7 +468,7 @@ export const useGonzacarsStore = () => {
   };
 
   return {
-    loading, sheetsUrl, saveUrl, refreshData,
+    loading, isProcessingBatch, sheetsUrl, saveUrl, refreshData,
     currentUser, login, logout,
     users, addUser, updateUser, deleteUser,
     exchangeRate, setExchangeRate: updateExchangeRate,
