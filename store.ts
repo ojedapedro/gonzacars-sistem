@@ -318,6 +318,8 @@ export const useGonzacarsStore = () => {
 
   // --- OPTIMIZED BATCH PURCHASE LOGIC ---
   const registerPurchaseBatch = (newPurchases: Purchase[]) => {
+    // IMPORTANTE: Trabajamos sobre una copia del inventario actual para simular la transacción completa
+    // antes de actualizar el estado de React. Esto evita que actualizaciones parciales se pierdan.
     const currentInventory = [...inventory];
     const processedPurchases: Purchase[] = [];
 
@@ -348,12 +350,14 @@ export const useGonzacarsStore = () => {
                 cost: p.price, // Actualizar último costo
                 lastEntry: p.date
             };
-            // Actualizar en memoria y sincronizar
+            // Actualizar en el array temporal en memoria
             currentInventory[productIndex] = updatedItem;
+            
+            // Sincronizar inmediatamente para persistencia
             syncRow('Inventory', 'update', updatedItem);
         } else {
             // -- CREAR NUEVO --
-            // Si no teníamos ID, generamos uno nuevo ahora
+            // Si no teníamos ID, generamos uno nuevo ahora. Si ya venía un ID temporal, se usa (raro en este flujo pero posible)
             if (!targetProductId) {
                 targetProductId = Math.random().toString(36).substr(2, 9);
             }
@@ -368,22 +372,28 @@ export const useGonzacarsStore = () => {
                 price: p.price * 1.35, // Margen sugerido del 35%
                 lastEntry: p.date
             };
+            
+            // Agregar al array temporal
             currentInventory.push(newItem);
+            
+            // Sincronizar nuevo producto
             syncRow('Inventory', 'add', newItem);
         }
 
         // 4. Preparar el registro de Compra final con el ID de producto correcto
-        // Esto vincula para siempre esta compra con ese producto específico
+        // Esto vincula para siempre esta compra con ese producto específico en el historial
         const finalPurchaseRecord = {
             ...p,
             productId: targetProductId 
         };
 
         processedPurchases.push(finalPurchaseRecord);
+        
+        // Sincronizar registro de compra
         syncRow('Purchases', 'add', finalPurchaseRecord);
     });
 
-    // 5. Actualizar estado global una sola vez
+    // 5. Actualizar estado global de React UNA SOLA VEZ al final del bucle
     setInventory(currentInventory);
     setPurchases(prev => [...prev, ...processedPurchases]);
   };

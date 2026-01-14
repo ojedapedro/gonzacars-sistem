@@ -78,7 +78,7 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
             price: existing.cost // Sugerir último costo
         }));
     } else {
-        // Si no existe o se cambió el nombre, resetear ID
+        // Si no existe o se cambió el nombre, resetear ID para que se cree como nuevo
         setCurrentItem(prev => ({ ...prev, productId: '' }));
     }
   };
