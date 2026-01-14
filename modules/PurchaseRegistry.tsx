@@ -66,12 +66,13 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
     const val = e.target.value;
     setCurrentItem(prev => ({ ...prev, productName: val }));
     
-    // Buscar si existe en inventario
-    const existing = store.inventory.find((p: Product) => p.name === val);
+    // Buscar si existe en inventario (Búsqueda insensible a mayúsculas)
+    const existing = store.inventory.find((p: Product) => p.name.toLowerCase() === val.toLowerCase());
+    
     if (existing) {
         setCurrentItem(prev => ({
             ...prev,
-            productName: existing.name,
+            productName: existing.name, // Usar nombre oficial del inventario
             productId: existing.id,
             category: existing.category,
             price: existing.cost // Sugerir último costo

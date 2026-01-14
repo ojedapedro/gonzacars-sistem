@@ -316,59 +316,76 @@ export const useGonzacarsStore = () => {
     setInventory(updatedInventory);
   };
 
-  // --- NUEVA LÓGICA DE COMPRAS POR LOTES (CRÍTICO PARA INVENTARIO) ---
-  // Reemplaza 'addPurchase' individual para evitar condiciones de carrera en el estado
+  // --- OPTIMIZED BATCH PURCHASE LOGIC ---
   const registerPurchaseBatch = (newPurchases: Purchase[]) => {
-    // 1. Actualizar estado de compras
-    setPurchases(prev => [...prev, ...newPurchases]);
-    
-    // 2. Procesar inventario EN MEMORIA para evitar actualizaciones parciales
-    let currentInventory = [...inventory];
-    
+    const currentInventory = [...inventory];
+    const processedPurchases: Purchase[] = [];
+
     newPurchases.forEach(p => {
-        // Enviar compra a Sheets
-        syncRow('Purchases', 'add', p);
+        let targetProductId = p.productId;
+        let productIndex = -1;
 
-        // Buscar producto existente por ID o Nombre Normalizado
-        const pNameNormalized = normalizeText(p.productName);
-        
-        const existingIndex = currentInventory.findIndex(invItem => 
-           invItem.id === p.productId || 
-           normalizeText(invItem.name) === pNameNormalized ||
-           (invItem.barcode && p.productId && invItem.barcode === p.productId) // Fallback si productId es un barcode
-        );
+        // 1. Intentar buscar por ID si viene provisto
+        if (targetProductId) {
+            productIndex = currentInventory.findIndex(i => i.id === targetProductId);
+        }
 
-        if (existingIndex >= 0) {
-            // ACTUALIZAR EXISTENTE
-            const existingItem = currentInventory[existingIndex];
+        // 2. Si no se encuentra o no hay ID, buscar por Nombre Normalizado (evita duplicados por mayúsculas/acentos)
+        if (productIndex === -1) {
+            const pNameNormalized = normalizeText(p.productName);
+            productIndex = currentInventory.findIndex(i => normalizeText(i.name) === pNameNormalized);
+        }
+
+        // 3. Lógica de Actualización vs Creación
+        if (productIndex > -1) {
+            // -- ACTUALIZAR EXISTENTE --
+            const existingItem = currentInventory[productIndex];
+            targetProductId = existingItem.id; // IMPORTANTE: Usar el ID real del inventario
+
             const updatedItem = {
                 ...existingItem,
                 quantity: existingItem.quantity + p.quantity,
-                cost: p.price, // Actualizar costo con el último precio de compra
+                cost: p.price, // Actualizar último costo
                 lastEntry: p.date
             };
-            // Reemplazar en el array en memoria
-            currentInventory[existingIndex] = updatedItem;
+            // Actualizar en memoria y sincronizar
+            currentInventory[productIndex] = updatedItem;
             syncRow('Inventory', 'update', updatedItem);
         } else {
-            // CREAR NUEVO
+            // -- CREAR NUEVO --
+            // Si no teníamos ID, generamos uno nuevo ahora
+            if (!targetProductId) {
+                targetProductId = Math.random().toString(36).substr(2, 9);
+            }
+
             const newItem: Product = {
-                id: p.productId || Math.random().toString(36).substr(2, 9),
-                barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(), // Generar barcode temporal si no hay
+                id: targetProductId,
+                barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
                 name: p.productName,
                 category: p.category,
                 quantity: p.quantity,
                 cost: p.price,
-                price: p.price * 1.35, // Margen sugerido del 35% por defecto
+                price: p.price * 1.35, // Margen sugerido del 35%
                 lastEntry: p.date
             };
             currentInventory.push(newItem);
             syncRow('Inventory', 'add', newItem);
         }
+
+        // 4. Preparar el registro de Compra final con el ID de producto correcto
+        // Esto vincula para siempre esta compra con ese producto específico
+        const finalPurchaseRecord = {
+            ...p,
+            productId: targetProductId 
+        };
+
+        processedPurchases.push(finalPurchaseRecord);
+        syncRow('Purchases', 'add', finalPurchaseRecord);
     });
 
-    // 3. Actualizar estado de inventario una sola vez
+    // 5. Actualizar estado global una sola vez
     setInventory(currentInventory);
+    setPurchases(prev => [...prev, ...processedPurchases]);
   };
 
   const addExpense = (expense: Expense) => {
@@ -458,7 +475,7 @@ export const useGonzacarsStore = () => {
     generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,
-    purchases, setPurchases, registerPurchaseBatch, // Exponemos la nueva función
+    purchases, setPurchases, registerPurchaseBatch,
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
     payroll, setPayroll, addPayrollRecord
