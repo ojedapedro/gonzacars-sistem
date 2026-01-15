@@ -3,11 +3,12 @@
  * GOOGLE SHEETS DATABASE SCRIPT - GONZACARS C.A.
  * ID: 1L-Fmfey-8ZR6vgF5DVR6B5fiSLbVYo7YDs7pIuBxmEU
  * RIF: J-50030426-9
+ * 
+ * UPDATE: Added LockService to prevent race conditions during concurrent writes.
  */
 
 const SPREADSHEET_ID = '1L-Fmfey-8ZR6vgF5DVR6B5fiSLbVYo7YDs7pIuBxmEU';
 
-// Ejecutar esta función una vez para preparar el archivo
 function setupDatabase() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheets = [
@@ -32,86 +33,115 @@ function setupDatabase() {
     sheet.setFrozenRows(1);
   });
   
-  // Usuarios iniciales por defecto
   const users = ss.getSheetByName('Users');
   users.appendRow(['u1', 'admin', 'admin', 'Admin Principal', 'administrador']);
   users.appendRow(['u2', 'vendedor', '1234', 'Vendedor Tienda', 'vendedor']);
   users.appendRow(['u3', 'cajero', '1234', 'Caja Taller', 'cajero']);
 
-  // Valor inicial de tasa si no existe
   const settings = ss.getSheetByName('Settings');
-  settings.appendRow(['exchangeRate', '0']);
+  settings.appendRow(['exchangeRate', '45.00']);
   
-  return "Base de datos inicializada correctamente con usuarios por defecto para RIF J-50030426-9.";
+  return "Base de datos inicializada correctamente.";
 }
 
 function doGet(e) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const data = {};
-  
-  ss.getSheets().forEach(sheet => {
-    const values = sheet.getDataRange().getValues();
-    const headers = values.shift();
-    data[sheet.getName()] = values.map(row => {
-      const obj = {};
-      headers.forEach((h, i) => {
-        let val = row[i];
-        // Intentar parsear JSON para campos complejos
-        if ((h === 'items' || h === 'evidencePhotos' || h === 'installments') && typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
-          try { val = JSON.parse(val); } catch (e) {}
-        }
-        obj[h] = val;
-      });
-      return obj;
+  const lock = LockService.getScriptLock();
+  // Wait up to 10 seconds for other processes to finish
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return ContentService.createTextOutput(JSON.stringify({error: "Server busy"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const data = {};
+    
+    ss.getSheets().forEach(sheet => {
+      const values = sheet.getDataRange().getValues();
+      if (values.length > 1) { // Only process if there's data beyond header
+        const headers = values.shift();
+        data[sheet.getName()] = values.map(row => {
+          const obj = {};
+          headers.forEach((h, i) => {
+            let val = row[i];
+            if ((h === 'items' || h === 'evidencePhotos' || h === 'installments') && typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+              try { val = JSON.parse(val); } catch (e) {}
+            }
+            obj[h] = val;
+          });
+          return obj;
+        });
+      } else {
+        data[sheet.getName()] = [];
+      }
     });
-  });
-  
-  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+    
+    return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function doPost(e) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const payload = JSON.parse(e.postData.contents);
-  const sheet = ss.getSheetByName(payload.sheet);
-  
-  if (!sheet) return ContentService.createTextOutput("Sheet not found").setMimeType(ContentService.MimeType.TEXT);
+  const lock = LockService.getScriptLock();
+  // Critical: Wait up to 30 seconds for the lock. 
+  // This prevents race conditions where two requests write to the same row at the same time.
+  try {
+    lock.waitLock(30000); 
+  } catch (e) {
+    return ContentService.createTextOutput("Error: Server busy, lock timeout").setMimeType(ContentService.MimeType.TEXT);
+  }
 
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0];
-  const action = payload.action; // 'add' | 'update' | 'delete'
-  
-  if (action === 'add') {
-    const newRow = headers.map(h => {
-      let val = payload.data[h];
-      return (typeof val === 'object') ? JSON.stringify(val) : val;
-    });
-    sheet.appendRow(newRow);
-  } 
-  else if (action === 'update') {
-    const idIndex = headers.indexOf('id');
-    const keyIndex = headers.indexOf('key'); // Para Settings
-    const matchIndex = idIndex !== -1 ? idIndex : keyIndex;
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const payload = JSON.parse(e.postData.contents);
+    const sheet = ss.getSheetByName(payload.sheet);
     
-    for (let i = 1; i < values.length; i++) {
-      if (values[i][matchIndex] === (payload.data.id || payload.data.key)) {
-        const updatedRow = headers.map(h => {
-          let val = payload.data[h];
-          return (typeof val === 'object') ? JSON.stringify(val) : val;
-        });
-        sheet.getRange(i + 1, 1, 1, headers.length).setValues([updatedRow]);
-        break;
-      }
-    }
-  }
-  else if (action === 'delete') {
-    const idIndex = headers.indexOf('id');
-    for (let i = 1; i < values.length; i++) {
-      if (values[i][idIndex] === payload.data.id) {
-        sheet.deleteRow(i + 1);
-        break;
-      }
-    }
-  }
+    if (!sheet) return ContentService.createTextOutput("Error: Sheet not found").setMimeType(ContentService.MimeType.TEXT);
 
-  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0];
+    const action = payload.action;
+    
+    if (action === 'add') {
+      const newRow = headers.map(h => {
+        let val = payload.data[h];
+        return (typeof val === 'object') ? JSON.stringify(val) : val;
+      });
+      sheet.appendRow(newRow);
+    } 
+    else if (action === 'update') {
+      const idIndex = headers.indexOf('id');
+      const keyIndex = headers.indexOf('key');
+      const matchIndex = idIndex !== -1 ? idIndex : keyIndex;
+      
+      // Reverse search is often faster for recent items, but standard loop is safer for consistency
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][matchIndex] === (payload.data.id || payload.data.key)) {
+          const updatedRow = headers.map(h => {
+            let val = payload.data[h];
+            return (typeof val === 'object') ? JSON.stringify(val) : val;
+          });
+          sheet.getRange(i + 1, 1, 1, headers.length).setValues([updatedRow]);
+          break; // Stop after first match
+        }
+      }
+    }
+    else if (action === 'delete') {
+      const idIndex = headers.indexOf('id');
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][idIndex] === payload.data.id) {
+          sheet.deleteRow(i + 1);
+          break;
+        }
+      }
+    }
+
+    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+  } catch (error) {
+    return ContentService.createTextOutput("Error: " + error.toString()).setMimeType(ContentService.MimeType.TEXT);
+  } finally {
+    lock.releaseLock();
+  }
 }

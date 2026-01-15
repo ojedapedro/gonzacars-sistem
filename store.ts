@@ -239,16 +239,39 @@ export const useGonzacarsStore = () => {
     refreshData();
   }, [sheetsUrl]);
 
-  const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete', data: any) => {
+  // SYSTEMA DE REINTENTOS PARA CONEXIÓN ROBUSTA
+  const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete', data: any, retries = 3) => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
-    try {
-      await fetch(sheetsUrl, {
-        method: 'POST',
-        redirect: 'follow',
-        body: JSON.stringify({ sheet, action, data })
-      });
-    } catch (e) {
-      console.error("Error sincronizando:", e);
+    
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(sheetsUrl, {
+                method: 'POST',
+                redirect: 'follow', // Vital para Google Apps Script
+                body: JSON.stringify({ sheet, action, data })
+            });
+            
+            // Apps Script suele devolver 200 incluso con errores lógicos, pero verificamos el texto
+            if (response.ok) {
+                const text = await response.text();
+                // Si el script devuelve "Error: ..." es que falló lógicamente
+                if (!text.includes("Error") && !text.includes("Exception")) {
+                    return true; // Éxito confirmado
+                } else {
+                    throw new Error("Apps Script Error: " + text);
+                }
+            }
+            throw new Error("Network response not ok: " + response.status);
+        } catch (e) {
+            console.warn(`Intento de sincronización ${i + 1}/${retries} fallido para ${sheet}:`, e);
+            
+            if (i === retries - 1) {
+                // Si es el último intento, lanzamos el error para que la UI lo sepa
+                throw e; 
+            }
+            // Espera exponencial: 1s, 2s, 3s...
+            await new Promise(r => setTimeout(r, 1000 * (i + 1))); 
+        }
     }
   };
 
@@ -306,91 +329,95 @@ export const useGonzacarsStore = () => {
     setInventory(updatedInventory);
   };
 
-  // --- LOGICA DE COMPRAS OPTIMIZADA: SECUENCIAL (BATCH PROCESSING) ---
-  // Soluciona el problema de filas perdidas en Google Sheets por concurrencia
+  // --- LOGICA DE COMPRAS OPTIMIZADA: SECUENCIAL Y CON VERIFICACIÓN DE ERRORES ---
   const registerPurchaseBatch = async (newPurchases: Purchase[]) => {
-    setIsProcessingBatch(true); // Bloquear interfaz o mostrar carga
+    setIsProcessingBatch(true);
     
-    // Copia local para búsqueda rápida durante el proceso
     const currentInventory = [...inventory];
+    let successCount = 0;
     
-    // Utilizamos un bucle for..of para permitir AWAIT dentro de cada iteración.
-    // Esto asegura que Google Sheets procese una fila a la vez.
-    for (const p of newPurchases) {
-        let targetProductId = p.productId;
-        let productIndex = -1;
+    try {
+        // Procesamos UNO POR UNO con espera activa
+        for (const p of newPurchases) {
+            let targetProductId = p.productId;
+            let productIndex = -1;
 
-        // 1. Buscar producto en el array local actualizado
-        if (targetProductId) {
-            productIndex = currentInventory.findIndex(i => i.id === targetProductId);
-        }
-
-        if (productIndex === -1) {
-            const pNameNormalized = normalizeText(p.productName);
-            productIndex = currentInventory.findIndex(i => normalizeText(i.name) === pNameNormalized);
-        }
-
-        // 2. Procesar Inventario
-        if (productIndex > -1) {
-            // -- ACTUALIZAR --
-            const existingItem = currentInventory[productIndex];
-            targetProductId = existingItem.id;
-
-            const updatedItem = {
-                ...existingItem,
-                quantity: existingItem.quantity + p.quantity,
-                cost: p.price,
-                lastEntry: p.date
-            };
-            
-            // Actualizar memoria local
-            currentInventory[productIndex] = updatedItem;
-            
-            // Enviar a BD y ESPERAR
-            await syncRow('Inventory', 'update', updatedItem);
-        } else {
-            // -- CREAR --
-            if (!targetProductId) {
-                targetProductId = Math.random().toString(36).substr(2, 9);
+            // 1. Buscar producto en el array local actualizado
+            if (targetProductId) {
+                productIndex = currentInventory.findIndex(i => i.id === targetProductId);
             }
 
-            const newItem: Product = {
-                id: targetProductId,
-                barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-                name: p.productName,
-                category: p.category,
-                quantity: p.quantity,
-                cost: p.price,
-                price: p.price * 1.35, 
-                lastEntry: p.date
-            };
-            
-            // Agregar a memoria local
-            currentInventory.push(newItem);
-            
-            // Enviar a BD y ESPERAR
-            await syncRow('Inventory', 'add', newItem);
+            if (productIndex === -1) {
+                const pNameNormalized = normalizeText(p.productName);
+                productIndex = currentInventory.findIndex(i => normalizeText(i.name) === pNameNormalized);
+            }
+
+            // 2. Procesar Inventario (Paso Crítico 1)
+            try {
+                if (productIndex > -1) {
+                    // -- ACTUALIZAR --
+                    const existingItem = currentInventory[productIndex];
+                    targetProductId = existingItem.id;
+
+                    const updatedItem = {
+                        ...existingItem,
+                        quantity: existingItem.quantity + p.quantity,
+                        cost: p.price,
+                        lastEntry: p.date
+                    };
+                    
+                    currentInventory[productIndex] = updatedItem;
+                    await syncRow('Inventory', 'update', updatedItem);
+                } else {
+                    // -- CREAR --
+                    if (!targetProductId) {
+                        targetProductId = Math.random().toString(36).substr(2, 9);
+                    }
+
+                    const newItem: Product = {
+                        id: targetProductId,
+                        barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+                        name: p.productName,
+                        category: p.category,
+                        quantity: p.quantity,
+                        cost: p.price,
+                        price: p.price * 1.35, 
+                        lastEntry: p.date
+                    };
+                    
+                    currentInventory.push(newItem);
+                    await syncRow('Inventory', 'add', newItem);
+                }
+            } catch (invError) {
+                // Si falla el inventario, NO registramos la compra para evitar inconsistencia
+                console.error(`Fallo crítico en inventario para ${p.productName}`, invError);
+                throw new Error(`Error al guardar en Inventario el producto: ${p.productName}. El proceso se detuvo.`);
+            }
+
+            // 3. Registrar la Compra (Paso Crítico 2)
+            try {
+                const finalPurchaseRecord = {
+                    ...p,
+                    productId: targetProductId 
+                };
+                await syncRow('Purchases', 'add', finalPurchaseRecord);
+            } catch (purchError) {
+                // Si falla el registro de compra pero el inventario pasó, es un problema menor pero igual paramos
+                console.error(`Fallo registro compra para ${p.productName}`, purchError);
+                throw new Error(`El inventario se actualizó pero falló el registro de compra para: ${p.productName}.`);
+            }
+
+            successCount++;
+            // Pequeño delay adicional para dar respiro al servidor
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
-
-        // 3. Registrar la Compra vinculada
-        const finalPurchaseRecord = {
-            ...p,
-            productId: targetProductId 
-        };
-        
-        // Enviar compra a BD y ESPERAR
-        await syncRow('Purchases', 'add', finalPurchaseRecord);
-
-        // Pequeño delay para dar respiro a la API de Google
-        await new Promise(resolve => setTimeout(resolve, 300));
+    } catch (error: any) {
+        // Alerta visible al usuario
+        alert(`ATENCIÓN: El proceso se interrumpió.\n\nMotivo: ${error.message}\n\nSe procesaron correctamente ${successCount} de ${newPurchases.length} productos.`);
+    } finally {
+        await refreshData();
+        setIsProcessingBatch(false);
     }
-
-    // 4. Finalizar
-    // Actualizamos el estado local de React con la data acumulada
-    // PERO, para seguridad total, hacemos un refreshData final para traer los datos reales de la hoja
-    // y asegurar que "Prueba 2, 4, 6" aparezcan si la BD los tiene.
-    await refreshData();
-    setIsProcessingBatch(false);
   };
 
   const addExpense = (expense: Expense) => {
