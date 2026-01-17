@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { Truck, Save, Search, Calendar, Filter, FileText, ChevronRight, DollarSign, Tag, User, Hash, Plus, Trash2, Package, CheckCircle, Clock, AlertCircle, Loader2, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
 import { Purchase, Product } from '../types';
 
 interface TemporaryItem {
@@ -15,6 +15,7 @@ interface TemporaryItem {
 const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
   const [activeTab, setActiveTab] = useState<'register' | 'history'>('register');
   const [isSaving, setIsSaving] = useState(false);
+  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
   
   // Datos del Encabezado (Proveedor y Factura)
   const [invoiceHeader, setInvoiceHeader] = useState({
@@ -38,8 +39,9 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
 
   // Filtros para el historial
   const [filters, setFilters] = useState({
+    invoiceNumber: '',
     provider: '',
-    status: 'Todas' as 'Todas' | 'Pendiente' | 'Cerrada',
+    status: 'Todas' as 'Todas' | 'Pendiente' | 'Cerrada' | 'Pagada',
     dateStart: '',
     dateEnd: ''
   });
@@ -137,16 +139,48 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
     }
   };
 
-  // Filtrado de Historial Avanzado
-  const filteredPurchases = useMemo(() => {
+  // --- LÓGICA DE HISTORIAL AGRUPADO ---
+  
+  // 1. Filtrar filas crudas
+  const filteredRawPurchases = useMemo(() => {
     return store.purchases.filter((p: Purchase) => {
       const matchStatus = filters.status === 'Todas' || p.status === filters.status;
       const matchProvider = !filters.provider || p.provider.toLowerCase().includes(filters.provider.toLowerCase());
+      const matchInvoice = !filters.invoiceNumber || p.invoiceNumber.toLowerCase().includes(filters.invoiceNumber.toLowerCase());
       const matchDateStart = !filters.dateStart || p.date >= filters.dateStart;
       const matchDateEnd = !filters.dateEnd || p.date <= filters.dateEnd;
-      return matchStatus && matchProvider && matchDateStart && matchDateEnd;
-    }).sort((a: Purchase, b: Purchase) => b.date.localeCompare(a.date));
+      return matchStatus && matchProvider && matchInvoice && matchDateStart && matchDateEnd;
+    });
   }, [store.purchases, filters]);
+
+  // 2. Agrupar por Factura
+  const groupedInvoices = useMemo(() => {
+    const groups: Record<string, { header: Purchase, items: Purchase[], total: number }> = {};
+    
+    filteredRawPurchases.forEach((p: Purchase) => {
+      // Clave única: Factura + Proveedor (por si hay números repetidos entre proveedores)
+      const key = `${p.invoiceNumber}-${p.provider}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          header: p, // Tomamos la primera fila como cabecera (contiene fecha, proveedor, tipo, etc.)
+          items: [],
+          total: 0
+        };
+      }
+      groups[key].items.push(p);
+      groups[key].total += p.total;
+    });
+
+    // Convertir a array y ordenar por fecha descendente
+    return Object.values(groups).sort((a, b) => b.header.date.localeCompare(a.header.date));
+  }, [filteredRawPurchases]);
+
+  const handlePayInvoice = async (invoiceNumber: string) => {
+    if (confirm(`¿Confirmas que deseas marcar la factura #${invoiceNumber} como PAGADA?`)) {
+      await store.payCreditInvoice(invoiceNumber);
+    }
+  };
 
   const invoiceTotal = invoiceItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   
@@ -348,6 +382,19 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           {/* Filtros Historial Avanzados */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[150px] space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nro. Factura</label>
+              <div className="relative">
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                <input 
+                  type="text" 
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none uppercase"
+                  placeholder="000123"
+                  value={filters.invoiceNumber}
+                  onChange={(e) => setFilters({...filters, invoiceNumber: e.target.value})}
+                />
+              </div>
+            </div>
             <div className="flex-1 min-w-[200px] space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Proveedor</label>
               <div className="relative">
@@ -362,27 +409,28 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
               </div>
             </div>
             <div className="w-48 space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado Factura</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado</label>
               <select 
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black uppercase outline-none cursor-pointer"
                 value={filters.status}
                 onChange={(e) => setFilters({...filters, status: e.target.value as any})}
               >
                 <option value="Todas">Ver Todas</option>
-                <option value="Pendiente">Pendientes</option>
-                <option value="Cerrada">Cerradas / Procesadas</option>
+                <option value="Pendiente">Borrador (Pendiente)</option>
+                <option value="Cerrada">Por Pagar / Crédito</option>
+                <option value="Pagada">Pagadas / Contado</option>
               </select>
             </div>
-            <div className="w-44 space-y-1.5">
+            <div className="w-40 space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Desde</label>
               <input type="date" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none" value={filters.dateStart} onChange={(e) => setFilters({...filters, dateStart: e.target.value})} />
             </div>
-            <div className="w-44 space-y-1.5">
+            <div className="w-40 space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hasta</label>
               <input type="date" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none" value={filters.dateEnd} onChange={(e) => setFilters({...filters, dateEnd: e.target.value})} />
             </div>
             <button 
-              onClick={() => setFilters({ provider: '', status: 'Todas', dateStart: '', dateEnd: '' })}
+              onClick={() => setFilters({ invoiceNumber: '', provider: '', status: 'Todas', dateStart: '', dateEnd: '' })}
               className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-colors"
               title="Limpiar filtros"
             >
@@ -390,62 +438,102 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
             </button>
           </div>
 
-          {/* Listado de Compras */}
-          <div className="flex-1 overflow-y-auto bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Factura / Fecha</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Proveedor</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Producto</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Cant.</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total ($)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredPurchases.map((p: Purchase) => (
-                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-5">
-                      <p className="text-slate-800 font-black text-xs">#{p.invoiceNumber}</p>
-                      <p className="text-[9px] font-bold text-slate-400">{p.date}</p>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="font-bold text-slate-700 uppercase text-xs">{p.provider}</span>
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter border ${
-                        p.status === 'Cerrada' 
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                          : 'bg-amber-100 text-amber-700 border-amber-200'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <p className="text-slate-900 font-bold text-xs uppercase">{p.productName}</p>
-                      <p className="text-[9px] font-black text-blue-500 uppercase tracking-tighter">{p.category}</p>
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                      <span className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black">{p.quantity}</span>
-                    </td>
-                    <td className="px-8 py-5 text-right font-black text-blue-600 text-lg">
-                      ${p.total.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                {filteredPurchases.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-8 py-20 text-center">
-                      <div className="flex flex-col items-center opacity-30">
-                        <AlertCircle size={48} className="mb-2" />
-                        <p className="italic font-bold">No se encontraron facturas con los filtros aplicados</p>
+          {/* Lista de Facturas Agrupadas */}
+          <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+            {groupedInvoices.map((invoice, idx) => {
+              const { header, items, total } = invoice;
+              const isExpanded = expandedInvoice === `${header.invoiceNumber}-${header.provider}`;
+              const isCredit = header.type === 'Crédito';
+              const isPaid = header.status === 'Pagada' || (!isCredit && header.status === 'Cerrada');
+              const isPendingPayment = isCredit && header.status !== 'Pagada';
+
+              return (
+                <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
+                  <div 
+                    className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors gap-4"
+                    onClick={() => setExpandedInvoice(isExpanded ? null : `${header.invoiceNumber}-${header.provider}`)}
+                  >
+                    <div className="flex items-center gap-6">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black shadow-lg ${isPendingPayment ? 'bg-amber-500' : 'bg-slate-900'}`}>
+                        {isPendingPayment ? <Clock size={20}/> : <CheckCircle size={20}/>}
                       </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight">#{header.invoiceNumber}</h4>
+                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border ${isCredit ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
+                            {header.type}
+                          </span>
+                          {isPaid && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500">Pagada</span>}
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 uppercase mt-1">{header.provider}</p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">{header.date}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end">
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Factura</p>
+                        <p className={`text-2xl font-black tracking-tighter ${isPendingPayment ? 'text-amber-600' : 'text-slate-900'}`}>${total.toFixed(2)}</p>
+                      </div>
+                      
+                      {isPendingPayment && store.payCreditInvoice && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePayInvoice(header.invoiceNumber);
+                          }}
+                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95 z-10"
+                        >
+                          <CreditCard size={14}/> Registrar Pago
+                        </button>
+                      )}
+
+                      <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-slate-200' : 'bg-slate-100'}`}>
+                        <ChevronDown size={16} className="text-slate-500"/>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detalle de Productos Expandible */}
+                  {isExpanded && (
+                    <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-in slide-in-from-top-2 duration-200">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                            <th className="pb-3 pl-4">Producto</th>
+                            <th className="pb-3 text-center">Categoría</th>
+                            <th className="pb-3 text-center">Cantidad</th>
+                            <th className="pb-3 text-right pr-4">Costo Unit.</th>
+                            <th className="pb-3 text-right pr-4">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                          {items.map((item) => (
+                            <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
+                              <td className="py-3 pl-4 font-bold text-slate-700 uppercase">{item.productName}</td>
+                              <td className="py-3 text-center text-slate-500 font-medium uppercase text-[10px]">{item.category}</td>
+                              <td className="py-3 text-center font-black text-slate-800 bg-white rounded-lg border border-slate-100 w-16 mx-auto block mt-1">{item.quantity}</td>
+                              <td className="py-3 text-right pr-4 text-slate-500">${item.price.toFixed(2)}</td>
+                              <td className="py-3 text-right pr-4 font-black text-slate-900">${item.total.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {groupedInvoices.length === 0 && (
+              <div className="py-20 text-center">
+                <div className="flex flex-col items-center opacity-30">
+                  <AlertCircle size={64} className="mb-4" />
+                  <p className="font-black text-xl text-slate-400 uppercase tracking-widest">Sin resultados</p>
+                  <p className="text-sm font-medium text-slate-400 mt-2">No se encontraron facturas con los filtros actuales</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

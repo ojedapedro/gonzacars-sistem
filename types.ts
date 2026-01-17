@@ -94,7 +94,7 @@ export interface Purchase {
   quantity: number;
   total: number;
   type: 'Contado' | 'Crédito';
-  status: 'Pendiente' | 'Cerrada';
+  status: 'Pendiente' | 'Cerrada' | 'Pagada';
 }
 
 export interface Expense {

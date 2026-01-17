@@ -420,6 +420,40 @@ export const useGonzacarsStore = () => {
     }
   };
 
+  // Función para pagar una factura completa (actualiza todas sus filas)
+  const payCreditInvoice = async (invoiceNumber: string) => {
+    setIsProcessingBatch(true);
+    try {
+      // Filtrar todas las filas de esa factura
+      const itemsToUpdate = purchases.filter(p => p.invoiceNumber === invoiceNumber && p.type === 'Crédito' && p.status !== 'Pagada');
+      
+      if (itemsToUpdate.length === 0) return;
+
+      const updatedPurchases = [...purchases];
+
+      for (const item of itemsToUpdate) {
+        const updatedItem = { ...item, status: 'Pagada' as const }; // Forzar el tipo literal
+        
+        // Actualizar localmente
+        const idx = updatedPurchases.findIndex(p => p.id === item.id);
+        if (idx !== -1) updatedPurchases[idx] = updatedItem;
+
+        // Sincronizar
+        await syncRow('Purchases', 'update', updatedItem);
+        // Pequeña espera para no saturar
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      setPurchases(updatedPurchases);
+      alert('Factura marcada como PAGADA correctamente.');
+    } catch (e) {
+      console.error(e);
+      alert('Error al procesar el pago de la factura.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
   const addExpense = (expense: Expense) => {
     setExpenses(prev => [...prev, expense]);
     syncRow('Expenses', 'add', expense);
@@ -504,7 +538,7 @@ export const useGonzacarsStore = () => {
     generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,
-    purchases, setPurchases, registerPurchaseBatch,
+    purchases, setPurchases, registerPurchaseBatch, payCreditInvoice,
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
     payroll, setPayroll, addPayrollRecord
