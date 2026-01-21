@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Wrench, 
@@ -26,6 +26,7 @@ import {
   ExternalLink,
   CheckCircle2
 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useGonzacarsStore } from './store';
 import RepairRegistration from './modules/RepairRegistration';
 import RepairReport from './modules/RepairReport';
@@ -50,6 +51,36 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // --- CHART DATA CALCULATION ---
+  const chartData = useMemo(() => {
+    const data = [];
+    const today = new Date();
+    // Últimos 14 días para el dashboard
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      
+      // Ventas del día
+      const salesTotal = store.sales
+        .filter((s: any) => s.date && s.date.startsWith(dateStr))
+        .reduce((sum: number, s: any) => sum + Number(s.total || 0), 0);
+
+      // Pagos de reparaciones del día
+      const repairsTotal = store.repairs.reduce((acc: number, r: any) => {
+        const payments = (r.installments || []).filter((inst: any) => inst.date && inst.date.startsWith(dateStr));
+        return acc + payments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      }, 0);
+
+      data.push({
+        name: d.toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
+        date: dateStr,
+        total: salesTotal + repairsTotal
+      });
+    }
+    return data;
+  }, [store.sales, store.repairs]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,17 +317,54 @@ const App: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8 bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
-               <div className="flex justify-between items-start mb-10">
+            <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden h-96">
+               <div className="flex justify-between items-start mb-6">
                   <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                         <TrendingUp className="text-blue-600" size={24}/> Resumen Mensual de Operaciones
                     </h3>
-                    <p className="text-sm text-slate-500 font-medium">Histórico de actividad reciente del taller</p>
+                    <p className="text-sm text-slate-500 font-medium">Ingresos diarios (Ventas + Taller) - Últimos 14 días</p>
                   </div>
                </div>
-               <div className="h-64 flex items-center justify-center border-2 border-dashed border-slate-100 rounded-[2rem] text-slate-300 font-black uppercase text-xs tracking-widest italic">
-                  Gráfico Estadístico en Tiempo Real
+               <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} 
+                        interval={1}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{fontSize: 10, fill: '#94a3b8'}} 
+                        tickFormatter={(val) => `$${val}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
+                        itemStyle={{color: '#1e293b', fontWeight: 'bold'}}
+                        labelStyle={{color: '#64748b', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px'}}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ingreso Total']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="total" 
+                        stroke="#2563eb" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorTotal)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                </div>
             </div>
 
