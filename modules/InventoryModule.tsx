@@ -1,8 +1,10 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle, ShieldCheck, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { Product, Purchase, Sale } from '../types';
+
+// Declare XLSX globally to bypass build resolution issues
+declare const XLSX: any;
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,6 +144,11 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
   };
 
   const handleDownloadExcel = () => {
+    if (typeof XLSX === 'undefined') {
+        alert("La librería de Excel no se ha cargado correctamente. Verifique su conexión a internet.");
+        return;
+    }
+
     const data = store.inventory.map((p: Product) => ({
       "Código de Barras": p.barcode || '',
       "Producto": p.name,
