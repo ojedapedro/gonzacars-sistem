@@ -13,7 +13,7 @@ interface TemporaryItem {
 }
 
 const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
-  const [activeTab, setActiveTab] = useState<'register' | 'history'>('register');
+  const [activeTab, setActiveTab] = useState<'register' | 'history'>('history');
   const [isSaving, setIsSaving] = useState(false);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
   
@@ -416,9 +416,9 @@ const PurchaseRegistry: React.FC<{ store: any }> = ({ store }) => {
                 onChange={(e) => setFilters({...filters, status: e.target.value as any})}
               >
                 <option value="Todas">Ver Todas</option>
-                <option value="Pendiente">Borrador (Pendiente)</option>
-                <option value="Cerrada">Por Pagar / Crédito</option>
-                <option value="Pagada">Pagadas / Contado</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Cerrada">Procesada</option>
+                <option value="Pagada">Pagada</option>
               </select>
             </div>
             <div className="w-40 space-y-1.5">

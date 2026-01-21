@@ -43,7 +43,7 @@ const LOGO_URL = "https://i.ibb.co/MDhy5tzK/image-2.png";
 
 const App: React.FC = () => {
   const store = useGonzacarsStore();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('purchases');
   const [tempUrl, setTempUrl] = useState(store.sheetsUrl);
   const [localRate, setLocalRate] = useState(store.exchangeRate);
 

@@ -16,7 +16,8 @@ import {
   Layers,
   ArrowDownCircle,
   Receipt,
-  PenTool
+  PenTool,
+  Check
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -39,6 +40,10 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   const [abonoMethod, setAbonoMethod] = useState<PaymentMethod>('Efectivo $');
   const [lastInstallment, setLastInstallment] = useState<Installment | null>(null);
   const [showAbonoReceipt, setShowAbonoReceipt] = useState(false);
+
+  // Nuevos estados para el flujo de finalización
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [printMode, setPrintMode] = useState<'none' | 'report' | 'receipt' | 'abono'>('none');
 
   const filteredInventory = useMemo(() => {
     return (store.inventory || []).filter((p: Product) => 
@@ -63,13 +68,6 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       alert('Placa no encontrada');
       setCurrentRepair(null);
     }
-  };
-
-  const handleStatusChange = (newStatus: ServiceStatus) => {
-    if (!currentRepair) return;
-    const updated = { ...currentRepair, status: newStatus };
-    setCurrentRepair(updated);
-    store.updateRepair(updated);
   };
 
   const saveManualService = () => {
@@ -184,25 +182,29 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       installments: updatedInstallments
     };
 
-    // 4. Guardar en Store y Actualizar Estado Local para que el PDF salga actualizado
+    // 4. Guardar en Store y Actualizar Estado Local
     store.updateRepair(updated);
     setCurrentRepair(updated);
     
-    // Asegurar que no se imprima el ticket de abono suelto
-    setLastInstallment(null);
+    // 5. Cerrar modal de pago y abrir modal de éxito/impresión
+    setShowPayModal(false);
+    setShowSuccessModal(true);
+  };
 
-    // 5. Esperar un momento para que React renderice el estado actualizado y lanzar impresión
+  const handlePrint = (mode: 'report' | 'receipt' | 'abono') => {
+    setPrintMode(mode);
+    // Pequeño delay para asegurar que el DOM se actualice antes de imprimir
     setTimeout(() => {
-      window.print();
-      
-      // 6. Limpiar todo después de imprimir
-      setTimeout(() => {
-        setCurrentRepair(null);
-        setSearchPlate('');
-        setShowPayModal(false);
-        setTempPaymentMethod('Efectivo $');
-      }, 500); // Pequeño delay post-impresión
-    }, 500); // Pequeño delay pre-impresión
+        window.print();
+    }, 100);
+  };
+
+  const handleFinishProcess = () => {
+    setShowSuccessModal(false);
+    setCurrentRepair(null);
+    setSearchPlate('');
+    setPrintMode('none');
+    setTempPaymentMethod('Efectivo $');
   };
 
   const getStatusBadge = (status: ServiceStatus) => {
@@ -216,8 +218,8 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       
-      {/* 1. INFORME CORPORATIVO TAMAÑO CARTA (PRINT ONLY) */}
-      {currentRepair && (
+      {/* 1. INFORME CORPORATIVO TAMAÑO CARTA (PRINT ONLY - REPORT MODE) */}
+      {currentRepair && printMode === 'report' && (
         <div className="hidden print:block print-only bg-white text-slate-900 p-10 font-sans min-h-screen max-w-[216mm] mx-auto">
           {/* Header Compacto */}
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
@@ -233,7 +235,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             </div>
             <div className="text-right">
               <h2 className="text-lg font-black uppercase text-slate-900 tracking-tight leading-none">
-                {currentRepair.status === 'Entregado' ? 'ORDEN DE SERVICIO - ENTREGADO' : 'PRESUPUESTO PRELIMINAR'}
+                {currentRepair.status === 'Entregado' ? 'INFORME DE SERVICIO' : 'PRESUPUESTO'}
               </h2>
               <p className="text-xl font-black text-slate-500">#{currentRepair.id.toUpperCase().slice(-6)}</p>
               <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
@@ -294,7 +296,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           {/* Historial de Pagos (Compacto) */}
           <div className="flex gap-8 mb-8">
             <div className="flex-1">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-1">Pagos Registrados</h4>
+              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-1">Desglose de Pagos</h4>
               {currentRepair.installments && currentRepair.installments.length > 0 ? (
                 <table className="w-full text-[10px]">
                   <tbody>
@@ -302,13 +304,13 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                       <tr key={idx} className="border-b border-slate-50 last:border-0">
                         <td className="py-1 text-slate-500">{new Date(inst.date).toLocaleDateString()}</td>
                         <td className="py-1 font-bold text-slate-700 uppercase">{inst.method}</td>
-                        <td className="py-1 text-right font-black text-emerald-600">-${inst.amount.toFixed(2)}</td>
+                        <td className="py-1 text-right font-black text-emerald-600">${inst.amount.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-[9px] text-slate-400 italic">No hay pagos previos registrados.</p>
+                <p className="text-[9px] text-slate-400 italic">No hay pagos registrados.</p>
               )}
             </div>
 
@@ -316,21 +318,16 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             <div className="w-64">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
                 <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
-                  <span>Subtotal:</span>
+                  <span>Total Servicio:</span>
                   <span>${calculateTotal().toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-bold text-emerald-600 uppercase">
-                  <span>Abonado:</span>
+                  <span>Total Pagado:</span>
                   <span>-${calculatePaid().toFixed(2)}</span>
                 </div>
                 <div className="border-t border-slate-300 pt-2 mt-1 flex justify-between items-end">
-                  <span className="text-xs font-black uppercase tracking-widest text-slate-900">Total a Pagar:</span>
-                  <span className="text-xl font-black text-slate-900 leading-none">${calculateBalance().toFixed(2)}</span>
-                </div>
-                <div className="text-right">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">
-                        {(calculateBalance() * store.exchangeRate).toLocaleString('es-VE')} Bs
-                    </span>
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-900">Saldo Pendiente:</span>
+                  <span className="text-xl font-black text-slate-900 leading-none">${Math.max(0, calculateBalance()).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -340,44 +337,135 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           <div className="mt-auto grid grid-cols-2 gap-16 pt-8 pb-4">
             <div className="text-center">
               <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Firma Cliente</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Recibí Conforme (Cliente)</p>
             </div>
             <div className="text-center">
               <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Autorizado Por</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Autorizado Por (Taller)</p>
             </div>
           </div>
           <div className="text-center text-[8px] font-medium text-slate-300 uppercase tracking-widest">
-            Documento generado electrónicamente por Sistema Gonzacars
+            Gonzacars C.A. - Garantía de Servicio
           </div>
         </div>
       )}
 
-      {/* 2. TICKET DE ABONO (PRINT ONLY) */}
-      {lastInstallment && currentRepair && !showPayModal && (
-        <div className="hidden print:block print-only bg-white text-slate-900 p-8 font-mono text-[11px] leading-tight" style={{ width: '80mm' }}>
+      {/* 2. RECIBO DE COBRO - FORMATO TICKET (PRINT ONLY - RECEIPT MODE) */}
+      {currentRepair && printMode === 'receipt' && (
+        <div className="hidden print:block print-only bg-white text-slate-900 p-6 font-mono text-[11px] leading-tight w-full max-w-[80mm] mx-auto">
           <div className="text-center mb-4">
-            <h3 className="font-black text-sm uppercase">Recibo de Abono</h3>
-            <p>Gonzacars C.A.</p>
+            <img src={LOGO_URL} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain grayscale" />
+            <h3 className="font-black text-sm uppercase">Recibo de Cobro</h3>
+            <p className="font-bold">Gonzacars C.A.</p>
             <p>RIF: J-50030426-9</p>
+            <p className="text-[9px] mt-1">Av. Bolivar, Valencia</p>
           </div>
-          <div className="border-y border-dashed border-slate-400 py-3 my-4 space-y-1">
-            <p>FECHA: {new Date(lastInstallment.date).toLocaleString()}</p>
-            <p>CLIENTE: {currentRepair.ownerName.toUpperCase()}</p>
-            <p>VEHÍCULO: {currentRepair.brand.toUpperCase()} {currentRepair.model.toUpperCase()}</p>
-            <p>PLACA: {currentRepair.plate.toUpperCase()}</p>
+          
+          <div className="border-y border-dashed border-slate-400 py-3 my-4 space-y-1 text-[10px]">
+            <div className="flex justify-between">
+               <span>ORDEN:</span>
+               <span className="font-bold">#{currentRepair.id.substring(0,6).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>FECHA:</span>
+               <span>{new Date().toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>PLACA:</span>
+               <span className="font-bold">{currentRepair.plate.toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>CLIENTE:</span>
+               <span className="uppercase truncate max-w-[100px]">{currentRepair.ownerName.split(' ')[0]}</span>
+            </div>
           </div>
-          <div className="flex justify-between font-black text-sm mt-4">
-            <span>MONTO RECIBIDO:</span>
+
+          <div className="mb-4">
+             <p className="text-[9px] font-bold uppercase border-b border-slate-200 mb-1">Conceptos</p>
+             {currentRepair.items.map((item, i) => (
+               <div key={i} className="flex justify-between text-[10px]">
+                  <span className="truncate max-w-[140px] uppercase">{item.quantity} x {item.description}</span>
+                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+               </div>
+             ))}
+          </div>
+
+          <div className="border-t border-dashed border-slate-900 pt-2 space-y-1 font-bold text-xs">
+            <div className="flex justify-between">
+              <span>TOTAL SERVICIO:</span>
+              <span>${calculateTotal().toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>TOTAL PAGADO:</span>
+              <span>${calculatePaid().toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between mt-2 text-sm font-black">
+              <span>SALDO:</span>
+              <span>${Math.max(0, calculateBalance()).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="text-center mt-6 pt-4 border-t border-slate-200">
+            <p className="text-[9px] font-black uppercase">¡Gracias por su preferencia!</p>
+            <p className="text-[8px] mt-1">Conserve este ticket como comprobante.</p>
+          </div>
+        </div>
+      )}
+
+      {/* 3. TICKET DE ABONO SUELTO (PRINT ONLY) - Detailed Statement */}
+      {lastInstallment && currentRepair && printMode === 'abono' && (
+        <div className="hidden print:block print-only bg-white text-slate-900 p-6 font-mono text-[11px] leading-tight w-full max-w-[80mm] mx-auto">
+          <div className="text-center mb-4">
+            <img src={LOGO_URL} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain grayscale" />
+            <h3 className="font-black text-sm uppercase">Comprobante de Abono</h3>
+            <p className="font-bold">Gonzacars C.A.</p>
+            <p>RIF: J-50030426-9</p>
+            <p className="text-[9px] mt-1">Av. Bolivar, Valencia</p>
+          </div>
+          
+          <div className="border-y border-dashed border-slate-400 py-3 my-4 space-y-1 text-[10px]">
+            <div className="flex justify-between">
+               <span>FECHA:</span>
+               <span>{new Date(lastInstallment.date).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>CLIENTE:</span>
+               <span className="uppercase font-bold truncate max-w-[120px]">{currentRepair.ownerName.split(' ')[0]}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>PLACA:</span>
+               <span className="font-bold">{currentRepair.plate.toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+               <span>MÉTODO:</span>
+               <span className="uppercase">{lastInstallment.method}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-4">
+             <div className="flex justify-between text-[10px]">
+                <span>TOTAL SERVICIO:</span>
+                <span>${calculateTotal().toFixed(2)}</span>
+             </div>
+             <div className="flex justify-between text-[10px]">
+                <span>ABONADO (PREV + ESTE):</span>
+                <span>${calculatePaid().toFixed(2)}</span>
+             </div>
+          </div>
+
+          <div className="flex justify-between font-black text-sm mt-2 bg-slate-100 p-2 rounded border border-slate-200">
+            <span>ABONO ACTUAL:</span>
             <span>${lastInstallment.amount.toFixed(2)}</span>
           </div>
-          <p className="text-right mt-1">MÉTODO: {lastInstallment.method}</p>
-          <div className="border-t border-dashed border-slate-400 pt-3 mt-4 flex justify-between font-bold">
-            <span>SALDO RESTANTE:</span>
-            <span>${calculateBalance().toFixed(2)}</span>
+          
+          <div className="border-t-2 border-dashed border-slate-900 pt-3 mt-4 flex justify-between font-black text-xs">
+            <span>SALDO PENDIENTE:</span>
+            <span>${Math.max(0, calculateBalance()).toFixed(2)}</span>
           </div>
-          <div className="text-center mt-8 border-t border-slate-200 pt-4 text-[9px] uppercase font-bold">
-            ¡Gracias por su pago!
+          
+          <div className="text-center mt-6 border-t border-slate-200 pt-4 text-[9px] uppercase font-bold">
+            <p>Este documento es un comprobante de pago parcial.</p>
+            <p className="mt-1">¡Gracias por su preferencia!</p>
           </div>
         </div>
       )}
@@ -424,7 +512,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                   <button onClick={() => setShowAbonoModal(true)} className="bg-emerald-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700">
                     <DollarSign size={14}/> Abono
                   </button>
-                  <button onClick={() => window.print()} className="bg-slate-800 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-700">
+                  <button onClick={() => handlePrint('report')} className="bg-slate-800 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-700">
                     <Printer size={14}/> Imprimir
                   </button>
                 </div>
@@ -449,45 +537,61 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
 
                 <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-900 text-white">
+                    <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Descripción</th>
-                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-center">Cant.</th>
-                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">P. Unit</th>
-                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Total</th>
-                        <th className="px-8 py-5"></th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Descripción del Item</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center w-32">Cantidad</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right w-40">Precio Unit.</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right w-40">Importe</th>
+                        <th className="px-6 py-4 w-16"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {currentRepair.items.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-8 py-5">
-                            <input 
-                              type="text" 
-                              className="w-full bg-transparent font-black text-slate-800 uppercase outline-none focus:text-blue-700"
-                              value={item.description}
-                              onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                            />
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className="flex items-center justify-center gap-3">
-                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="text-slate-400 hover:text-blue-600"><Minus size={14}/></button>
-                              <span className="font-black text-slate-900 w-8 text-center">{item.quantity}</span>
-                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="text-slate-400 hover:text-blue-600"><Plus size={14}/></button>
+                        <tr key={item.id} className="group hover:bg-blue-50/30 transition-colors duration-200">
+                          <td className="px-6 py-4">
+                            <div className="relative">
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-transparent font-bold text-slate-700 uppercase outline-none border-b border-transparent focus:border-blue-500 focus:text-blue-600 transition-all placeholder:text-slate-300"
+                                  value={item.description}
+                                  onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                  placeholder="Descripción del servicio o repuesto"
+                                />
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mt-1">{item.type}</span>
                             </div>
                           </td>
-                          <td className="px-8 py-5 text-right">
-                            <input 
-                              type="number" 
-                              className="w-24 text-right bg-transparent font-black text-slate-800 outline-none"
-                              value={item.price}
-                              onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
-                            />
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm w-fit mx-auto">
+                              <button onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Minus size={14}/></button>
+                              <input 
+                                type="number" 
+                                className="w-10 text-center font-black text-slate-700 bg-transparent outline-none text-sm"
+                                value={item.quantity}
+                                onChange={(e) => updateItem(item.id, 'quantity', Number(e.target.value))}
+                              />
+                              <button onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Plus size={14}/></button>
+                            </div>
                           </td>
-                          <td className="px-8 py-5 text-right font-black text-slate-950">${(item.price * item.quantity).toFixed(2)}</td>
-                          <td className="px-8 py-5 text-right">
-                            <button onClick={() => removeItem(item.id)} className="text-slate-200 hover:text-red-500 transition-colors">
-                              <Trash2 size={18}/>
+                          <td className="px-6 py-4 text-right">
+                             <div className="relative">
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                <input 
+                                  type="number" 
+                                  className="w-full text-right bg-transparent font-bold text-slate-700 outline-none border-b border-transparent focus:border-blue-500 transition-all"
+                                  value={item.price}
+                                  onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
+                                />
+                             </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <span className="font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-lg">
+                                ${(item.price * item.quantity).toFixed(2)}
+                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                              <Trash2 size={16}/>
                             </button>
                           </td>
                         </tr>
@@ -498,7 +602,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
               </div>
 
               <div className="pt-10 border-t-4 border-slate-100 flex gap-4">
-                <button onClick={() => window.print()} className="flex-1 bg-white border-2 border-slate-900 py-6 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 transition-all">
+                <button onClick={() => handlePrint('report')} className="flex-1 bg-white border-2 border-slate-900 py-6 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 transition-all">
                   <Printer size={24}/> Imprimir Informe Preliminar
                 </button>
                 <button onClick={() => setShowPayModal(true)} className="flex-1 bg-blue-600 text-white py-6 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100">
@@ -606,29 +710,59 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
       {/* MODAL RECIBO ABONO (RESULTADO) */}
       {showAbonoReceipt && lastInstallment && (
         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center z-[110] p-4 print:hidden">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in duration-300">
-            <div className="bg-emerald-600 p-8 text-white text-center">
-              <Receipt size={48} className="mx-auto mb-4 opacity-50" />
-              <h3 className="text-2xl font-black uppercase tracking-tight">¡Pago Exitoso!</h3>
-              <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mt-1 opacity-80 italic">Comprobante de Caja</p>
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+            {/* Header */}
+            <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
+               <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Comprobante de Pago</h3>
+               <button onClick={() => setShowAbonoReceipt(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
-            <div className="p-8">
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4 mb-8">
-                 <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Importe</span>
-                    <span className="text-2xl font-black text-slate-900">${lastInstallment.amount.toFixed(2)}</span>
-                 </div>
-                 <div className="flex justify-between items-center border-t border-slate-200 pt-4">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Restante</span>
-                    <span className="text-lg font-black text-blue-600">${calculateBalance().toFixed(2)}</span>
-                 </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                 <button onClick={() => { window.print(); setShowAbonoReceipt(false); }} className="bg-slate-900 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all">
-                    <Printer size={18}/> Imprimir Ticket
-                 </button>
-                 <button onClick={() => setShowAbonoReceipt(false)} className="py-3 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:text-slate-600">Continuar</button>
-              </div>
+            
+            {/* Content "Statement" */}
+            <div className="p-8 bg-white space-y-6">
+               <div className="text-center">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{new Date(lastInstallment.date).toLocaleDateString()} - {new Date(lastInstallment.date).toLocaleTimeString()}</p>
+                  <h2 className="text-4xl font-black text-slate-900 tracking-tighter">${lastInstallment.amount.toFixed(2)}</h2>
+                  <span className="inline-block mt-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
+                    Abono Recibido
+                  </span>
+               </div>
+
+               <div className="space-y-3 pt-6 border-t border-dashed border-slate-200">
+                  <div className="flex justify-between text-xs">
+                     <span className="font-bold text-slate-500 uppercase">Total Servicio</span>
+                     <span className="font-black text-slate-900">${calculateTotal().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                     <span className="font-bold text-slate-500 uppercase">Abonado (Inc. este pago)</span>
+                     <span className="font-black text-emerald-600">-${calculatePaid().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
+                     <span className="font-black text-slate-800 uppercase">Saldo Restante</span>
+                     <span className="font-black text-blue-600">${calculateBalance().toFixed(2)}</span>
+                  </div>
+               </div>
+
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-[10px] space-y-1">
+                  <div className="flex justify-between">
+                     <span className="text-slate-400 font-bold uppercase">Cliente:</span>
+                     <span className="font-black text-slate-700 uppercase">{currentRepair?.ownerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                     <span className="text-slate-400 font-bold uppercase">Vehículo:</span>
+                     <span className="font-black text-slate-700 uppercase">{currentRepair?.plate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                     <span className="text-slate-400 font-bold uppercase">Método:</span>
+                     <span className="font-black text-slate-700 uppercase">{lastInstallment.method}</span>
+                  </div>
+               </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+               <button onClick={() => { handlePrint('abono'); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all shadow-lg">
+                  <Printer size={16}/> Imprimir
+               </button>
             </div>
           </div>
         </div>
@@ -654,10 +788,68 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                 ))}
               </select>
               <button onClick={finalizeRepair} className="w-full py-8 bg-slate-900 text-white rounded-3xl font-black uppercase text-sm tracking-[0.3em] hover:bg-black shadow-2xl shadow-slate-200 transition-all active:scale-95">
-                Cerrar e Imprimir Informe Final
+                Cerrar y Emitir Documentos
               </button>
               <button onClick={() => setShowPayModal(false)} className="w-full py-4 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:text-red-500 transition-colors">Volver</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ÉXITO Y OPCIONES DE IMPRESIÓN */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center z-[120] p-4 print:hidden">
+          <div className="bg-white rounded-[3rem] shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in duration-300">
+             <div className="bg-emerald-600 p-10 text-white text-center">
+               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-md shadow-xl">
+                 <Check size={40} className="text-white" />
+               </div>
+               <h3 className="text-3xl font-black uppercase tracking-tighter">¡Servicio Finalizado!</h3>
+               <p className="text-emerald-100 font-bold uppercase text-xs tracking-widest mt-2">El vehículo ha sido entregado correctamente</p>
+             </div>
+             
+             <div className="p-10 space-y-4">
+               <p className="text-center text-slate-500 text-xs font-bold uppercase tracking-widest mb-6">Seleccione el documento a imprimir:</p>
+               
+               <button 
+                 onClick={() => handlePrint('report')}
+                 className="w-full bg-white border-2 border-slate-100 hover:border-blue-600 hover:bg-blue-50 text-slate-800 py-5 rounded-2xl flex items-center justify-between px-6 transition-all group shadow-sm"
+               >
+                 <div className="flex items-center gap-4">
+                   <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                     <FileText size={20} />
+                   </div>
+                   <div className="text-left">
+                     <span className="block font-black uppercase text-xs tracking-wide">Informe Técnico</span>
+                     <span className="text-[10px] text-slate-400 font-bold">Formato A4 / Carta (Garantía)</span>
+                   </div>
+                 </div>
+                 <Printer size={18} className="text-slate-300 group-hover:text-blue-600" />
+               </button>
+
+               <button 
+                 onClick={() => handlePrint('receipt')}
+                 className="w-full bg-white border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50 text-slate-800 py-5 rounded-2xl flex items-center justify-between px-6 transition-all group shadow-sm"
+               >
+                 <div className="flex items-center gap-4">
+                   <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                     <Receipt size={20} />
+                   </div>
+                   <div className="text-left">
+                     <span className="block font-black uppercase text-xs tracking-wide">Recibo de Cobro</span>
+                     <span className="text-[10px] text-slate-400 font-bold">Formato Ticket (Caja)</span>
+                   </div>
+                 </div>
+                 <Printer size={18} className="text-slate-300 group-hover:text-emerald-600" />
+               </button>
+
+               <button 
+                 onClick={handleFinishProcess}
+                 className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl mt-4"
+               >
+                 Finalizar Proceso
+               </button>
+             </div>
           </div>
         </div>
       )}
