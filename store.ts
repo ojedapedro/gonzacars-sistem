@@ -7,7 +7,7 @@ const STORED_USER = localStorage.getItem('gz_active_user');
 
 export const useGonzacarsStore = () => {
   const [loading, setLoading] = useState(false);
-  const [isProcessingBatch, setIsProcessingBatch] = useState(false); // Nuevo estado para indicar carga masiva
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState(DEFAULT_SHEETS_URL);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -28,7 +28,6 @@ export const useGonzacarsStore = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
 
-  // Detectar configuración por URL (para abrir en otros dispositivos fácilmente)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const configUrl = params.get('config_db');
@@ -36,7 +35,6 @@ export const useGonzacarsStore = () => {
       const decoded = decodeURIComponent(configUrl);
       if (decoded.startsWith('https://script.google.com')) {
         saveUrl(decoded);
-        // Limpiar URL para estética
         window.history.replaceState({}, document.title, window.location.pathname);
         alert("¡Configuración de base de datos importada con éxito!");
       }
@@ -83,7 +81,7 @@ export const useGonzacarsStore = () => {
     localStorage.removeItem('gz_active_user');
   };
 
-  // --- HELPER FUNCTIONS ROBUSTAS ---
+  // --- HELPER FUNCTIONS ---
 
   const getVal = (item: any, possibleKeys: string[]): any => {
     if (!item || typeof item !== 'object') return undefined;
@@ -116,12 +114,16 @@ export const useGonzacarsStore = () => {
   };
 
   const normalizeText = (text: string) => {
-    return String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    return String(text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
+  };
+
+  const generateBarcode = () => {
+    return Math.floor(100000000000 + Math.random() * 900000000000).toString();
   };
 
   const refreshData = async () => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
-    if (isProcessingBatch) return; // Evitar refrescar mientras se procesa un lote crítico
+    if (isProcessingBatch) return;
 
     setLoading(true);
     try {
@@ -132,11 +134,11 @@ export const useGonzacarsStore = () => {
       if (Array.isArray(data.Users)) {
         setUsers(data.Users.map((u: any) => ({
           ...u,
-          id: safeString(getVal(u, ['id', 'ID', 'Id'])),
-          username: safeString(getVal(u, ['username', 'usuario', 'user'])),
-          password: safeString(getVal(u, ['password', 'clave', 'pass'])),
+          id: safeString(getVal(u, ['id', 'ID'])),
+          username: safeString(getVal(u, ['username', 'usuario'])),
+          password: safeString(getVal(u, ['password', 'clave'])),
           name: safeString(getVal(u, ['name', 'nombre'])),
-          role: safeString(getVal(u, ['role', 'rol', 'cargo']))
+          role: safeString(getVal(u, ['role', 'rol']))
         })));
       }
       
@@ -145,9 +147,9 @@ export const useGonzacarsStore = () => {
       if (Array.isArray(data.Inventory)) {
         const mappedInventory = data.Inventory.map((p: any) => {
           const rawName = getVal(p, ['name', 'nombre', 'producto', 'product', 'descripcion']);
-          const rawBarcode = getVal(p, ['barcode', 'codigo', 'code', 'id', 'referencia']);
-          const rawCategory = getVal(p, ['category', 'categoria', 'cat', 'rubro']);
-          const rawQty = getVal(p, ['quantity', 'cantidad', 'stock', 'cant', 'existencia']);
+          const rawBarcode = getVal(p, ['barcode', 'codigo', 'code', 'id']);
+          const rawCategory = getVal(p, ['category', 'categoria', 'rubro']);
+          const rawQty = getVal(p, ['quantity', 'cantidad', 'stock']);
           const rawCost = getVal(p, ['cost', 'costo', 'compra']);
           const rawPrice = getVal(p, ['price', 'precio', 'venta', 'pvp']);
           const rawId = getVal(p, ['id', 'ID', 'uuid']);
@@ -163,7 +165,6 @@ export const useGonzacarsStore = () => {
             price: safeNumber(rawPrice)
           };
         });
-        // Filtrado más permisivo para evitar ocultar productos válidos
         setInventory(mappedInventory.filter((p: Product) => p.name.length > 0));
       }
       
@@ -219,7 +220,7 @@ export const useGonzacarsStore = () => {
       
       if (Array.isArray(data.Settings)) {
         const rateSetting = data.Settings.find((s: any) => {
-           const k = getVal(s, ['key', 'clave', 'parametro']);
+           const k = getVal(s, ['key', 'clave']);
            return k === 'exchangeRate';
         });
         if (rateSetting) {
@@ -239,41 +240,101 @@ export const useGonzacarsStore = () => {
     refreshData();
   }, [sheetsUrl]);
 
-  // SYSTEMA DE REINTENTOS PARA CONEXIÓN ROBUSTA
-  const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete', data: any, retries = 3) => {
+  // SYNC CON RETRIES Y BACKOFF EXPONENCIAL
+  const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete' | 'batch_purchase' | 'audit_inventory', data: any, retries = 3) => {
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(sheetsUrl, {
                 method: 'POST',
-                redirect: 'follow', // Vital para Google Apps Script
+                redirect: 'follow',
                 body: JSON.stringify({ sheet, action, data })
             });
             
-            // Apps Script suele devolver 200 incluso con errores lógicos, pero verificamos el texto
             if (response.ok) {
                 const text = await response.text();
-                // Si el script devuelve "Error: ..." es que falló lógicamente
                 if (!text.includes("Error") && !text.includes("Exception")) {
-                    return true; // Éxito confirmado
+                    return true;
                 } else {
                     throw new Error("Apps Script Error: " + text);
                 }
             }
             throw new Error("Network response not ok: " + response.status);
         } catch (e) {
-            console.warn(`Intento de sincronización ${i + 1}/${retries} fallido para ${sheet}:`, e);
-            
-            if (i === retries - 1) {
-                // Si es el último intento, lanzamos el error para que la UI lo sepa
-                throw e; 
-            }
-            // Espera exponencial: 1s, 2s, 3s...
+            console.warn(`Intento ${i + 1}/${retries} fallido para ${sheet}:`, e);
+            if (i === retries - 1) throw e;
             await new Promise(r => setTimeout(r, 1000 * (i + 1))); 
         }
     }
   };
+
+  // --- LOGICA BLINDADA DE COMPRAS E INVENTARIO (LOTE ATÓMICO) ---
+  const registerPurchaseBatch = async (newPurchases: Purchase[]) => {
+    setIsProcessingBatch(true);
+    
+    try {
+        // Pre-procesamiento local: Asignar IDs si no existen
+        const processedPurchases = newPurchases.map(p => ({
+            ...p,
+            id: p.id || Math.random().toString(36).substr(2, 9),
+            // Si el producto ya existe en local, mandamos su ID para que el backend lo encuentre rápido
+            productId: p.productId || (inventory.find(i => normalizeText(i.name) === normalizeText(p.productName))?.id || '')
+        }));
+
+        // ENVIAR TODO EL LOTE EN UNA SOLA PETICIÓN (Acción: 'batch_purchase')
+        await syncRow('Purchases', 'batch_purchase', processedPurchases);
+        
+        await refreshData();
+        
+    } catch (error: any) {
+        alert(`ERROR CRÍTICO: No se pudo registrar la factura.\n\nDetalle: ${error.message}\n\nIntente de nuevo, no se guardó ningún cambio parcial.`);
+    } finally {
+        setIsProcessingBatch(false);
+    }
+  };
+
+  // --- NUEVA FUNCIÓN DE AUDITORÍA GLOBAL ---
+  const runGlobalAudit = async () => {
+    setIsProcessingBatch(true);
+    try {
+       await syncRow('Inventory', 'audit_inventory', {});
+       alert("¡Auditoría Completa! El inventario ha sido reconciliado con el historial de compras y ventas.");
+       await refreshData();
+    } catch (error: any) {
+       alert("Error durante la auditoría: " + error.message);
+    } finally {
+       setIsProcessingBatch(false);
+    }
+  };
+
+  const payCreditInvoice = async (invoiceNumber: string) => {
+    setIsProcessingBatch(true);
+    try {
+      const itemsToUpdate = purchases.filter(p => p.invoiceNumber === invoiceNumber && p.type === 'Crédito' && p.status !== 'Pagada');
+      if (itemsToUpdate.length === 0) return;
+
+      const updatedPurchases = [...purchases];
+
+      for (const item of itemsToUpdate) {
+        const updatedItem = { ...item, status: 'Pagada' as const };
+        const idx = updatedPurchases.findIndex(p => p.id === item.id);
+        if (idx !== -1) updatedPurchases[idx] = updatedItem;
+        await syncRow('Purchases', 'update', updatedItem);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      setPurchases(updatedPurchases);
+      alert('Factura marcada como PAGADA correctamente.');
+    } catch (e) {
+      console.error(e);
+      alert('Error al procesar el pago de la factura.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  // --- RESTO DE FUNCIONES CRUD ---
 
   const addUser = (user: User) => {
     setUsers(prev => [...prev, user]);
@@ -314,9 +375,7 @@ export const useGonzacarsStore = () => {
     setSales(prev => [...prev, sale]);
     syncRow('Sales', 'add', sale);
     
-    // Para ventas (salida de stock), también debería ser secuencial idealmente,
-    // pero como suele ser 1 venta = pocos items, lo dejamos así por ahora.
-    // Si hay problemas, aplicar misma lógica que en compras.
+    // Actualización optimista de inventario para ventas (simple)
     const updatedInventory = inventory.map(item => {
       const soldItem = sale.items.find(si => si.productId === item.id);
       if (soldItem) {
@@ -327,131 +386,6 @@ export const useGonzacarsStore = () => {
       return item;
     });
     setInventory(updatedInventory);
-  };
-
-  // --- LOGICA DE COMPRAS OPTIMIZADA: SECUENCIAL Y CON VERIFICACIÓN DE ERRORES ---
-  const registerPurchaseBatch = async (newPurchases: Purchase[]) => {
-    setIsProcessingBatch(true);
-    
-    const currentInventory = [...inventory];
-    let successCount = 0;
-    
-    try {
-        // Procesamos UNO POR UNO con espera activa
-        for (const p of newPurchases) {
-            let targetProductId = p.productId;
-            let productIndex = -1;
-
-            // 1. Buscar producto en el array local actualizado
-            if (targetProductId) {
-                productIndex = currentInventory.findIndex(i => i.id === targetProductId);
-            }
-
-            if (productIndex === -1) {
-                const pNameNormalized = normalizeText(p.productName);
-                productIndex = currentInventory.findIndex(i => normalizeText(i.name) === pNameNormalized);
-            }
-
-            // 2. Procesar Inventario (Paso Crítico 1)
-            try {
-                if (productIndex > -1) {
-                    // -- ACTUALIZAR --
-                    const existingItem = currentInventory[productIndex];
-                    targetProductId = existingItem.id;
-
-                    const updatedItem = {
-                        ...existingItem,
-                        quantity: existingItem.quantity + p.quantity,
-                        cost: p.price,
-                        lastEntry: p.date
-                    };
-                    
-                    currentInventory[productIndex] = updatedItem;
-                    await syncRow('Inventory', 'update', updatedItem);
-                } else {
-                    // -- CREAR --
-                    if (!targetProductId) {
-                        targetProductId = Math.random().toString(36).substr(2, 9);
-                    }
-
-                    const newItem: Product = {
-                        id: targetProductId,
-                        barcode: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-                        name: p.productName,
-                        category: p.category,
-                        quantity: p.quantity,
-                        cost: p.price,
-                        price: p.price * 1.35, 
-                        lastEntry: p.date
-                    };
-                    
-                    currentInventory.push(newItem);
-                    await syncRow('Inventory', 'add', newItem);
-                }
-            } catch (invError) {
-                // Si falla el inventario, NO registramos la compra para evitar inconsistencia
-                console.error(`Fallo crítico en inventario para ${p.productName}`, invError);
-                throw new Error(`Error al guardar en Inventario el producto: ${p.productName}. El proceso se detuvo.`);
-            }
-
-            // 3. Registrar la Compra (Paso Crítico 2)
-            try {
-                const finalPurchaseRecord = {
-                    ...p,
-                    productId: targetProductId 
-                };
-                await syncRow('Purchases', 'add', finalPurchaseRecord);
-            } catch (purchError) {
-                // Si falla el registro de compra pero el inventario pasó, es un problema menor pero igual paramos
-                console.error(`Fallo registro compra para ${p.productName}`, purchError);
-                throw new Error(`El inventario se actualizó pero falló el registro de compra para: ${p.productName}.`);
-            }
-
-            successCount++;
-            // Pequeño delay adicional para dar respiro al servidor
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-    } catch (error: any) {
-        // Alerta visible al usuario
-        alert(`ATENCIÓN: El proceso se interrumpió.\n\nMotivo: ${error.message}\n\nSe procesaron correctamente ${successCount} de ${newPurchases.length} productos.`);
-    } finally {
-        await refreshData();
-        setIsProcessingBatch(false);
-    }
-  };
-
-  // Función para pagar una factura completa (actualiza todas sus filas)
-  const payCreditInvoice = async (invoiceNumber: string) => {
-    setIsProcessingBatch(true);
-    try {
-      // Filtrar todas las filas de esa factura
-      const itemsToUpdate = purchases.filter(p => p.invoiceNumber === invoiceNumber && p.type === 'Crédito' && p.status !== 'Pagada');
-      
-      if (itemsToUpdate.length === 0) return;
-
-      const updatedPurchases = [...purchases];
-
-      for (const item of itemsToUpdate) {
-        const updatedItem = { ...item, status: 'Pagada' as const }; // Forzar el tipo literal
-        
-        // Actualizar localmente
-        const idx = updatedPurchases.findIndex(p => p.id === item.id);
-        if (idx !== -1) updatedPurchases[idx] = updatedItem;
-
-        // Sincronizar
-        await syncRow('Purchases', 'update', updatedItem);
-        // Pequeña espera para no saturar
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
-      setPurchases(updatedPurchases);
-      alert('Factura marcada como PAGADA correctamente.');
-    } catch (e) {
-      console.error(e);
-      alert('Error al procesar el pago de la factura.');
-    } finally {
-      setIsProcessingBatch(false);
-    }
   };
 
   const addExpense = (expense: Expense) => {
@@ -535,12 +469,13 @@ export const useGonzacarsStore = () => {
     exchangeRate, setExchangeRate: updateExchangeRate,
     customers, addCustomer,
     inventory, setInventory, updateInventoryPrice, updateProductName, updateInventoryQuantity, updateStockBatch, updateBarcode, 
-    generateBarcode: () => Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+    generateBarcode,
     repairs, setRepairs, addRepair, updateRepair,
     sales, setSales, addSale,
     purchases, setPurchases, registerPurchaseBatch, payCreditInvoice,
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
-    payroll, setPayroll, addPayrollRecord
+    payroll, setPayroll, addPayrollRecord,
+    runGlobalAudit // Export new audit function
   };
 };

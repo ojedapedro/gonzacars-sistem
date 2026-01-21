@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle } from 'lucide-react';
+import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle, ShieldCheck } from 'lucide-react';
 import { Product, Purchase, Sale } from '../types';
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
@@ -196,6 +196,12 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     setBulkPreview([]);
   };
 
+  const handleGlobalAudit = () => {
+    if (confirm("¿Estás seguro de ejecutar la Auditoría Global?\n\nEsta acción revisará TODAS las compras y ventas históricas para recalcular el inventario y asegurar que no falte ningún producto registrado en compras.\n\nEste proceso puede tomar unos segundos.")) {
+      store.runGlobalAudit();
+    }
+  };
+
   // KARDEX LOGIC: Combine Purchases (Entries) and Sales (Exits)
   const getProductMovements = (product: Product) => {
     const movements: any[] = [];
@@ -250,6 +256,13 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-slate-500 font-medium">Gestión de stock, precios y auditoría de abastecimiento</p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
+          <button 
+             onClick={handleGlobalAudit}
+             disabled={store.isProcessingBatch}
+             className="bg-purple-600 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-purple-700 shadow-lg shadow-purple-100 transition-all active:scale-95 disabled:opacity-50"
+          >
+             <ShieldCheck size={18}/> Auditoría Compras
+          </button>
           <button 
              onClick={() => setShowBulkModal(true)}
              className="bg-emerald-600 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
