@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Package, Search, Edit3, AlertCircle, Barcode, RotateCw, History, X, Truck, Calendar, DollarSign, ArrowRight, Filter, ChevronDown, ArrowUp, ArrowDown, ClipboardCheck, TrendingUp, TrendingDown, AlertTriangle, Save, FileSpreadsheet, UploadCloud, CheckCircle, ShieldCheck, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Product, Purchase, Sale } from '../types';
 
 const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
@@ -140,6 +141,32 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     setShowAuditModal(false);
   };
 
+  const handleDownloadExcel = () => {
+    const data = store.inventory.map((p: Product) => ({
+      "Código de Barras": p.barcode || '',
+      "Producto": p.name,
+      "Categoría": p.category,
+      "Cantidad Teórica": p.quantity,
+      "Cantidad Contada": "" // Empty for manual entry
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Adjust column widths
+    const wscols = [
+      { wch: 20 }, // Barcode
+      { wch: 40 }, // Name
+      { wch: 20 }, // Category
+      { wch: 15 }, // Theoretical
+      { wch: 15 }  // Counted
+    ];
+    worksheet['!cols'] = wscols;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Físico");
+    XLSX.writeFile(workbook, `Inventario_Gonzacars_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -256,6 +283,12 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
           <p className="text-slate-500 font-medium">Gestión de stock, precios y auditoría de abastecimiento</p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
+          <button 
+             onClick={handleDownloadExcel}
+             className="bg-slate-900 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-black shadow-lg shadow-slate-200 transition-all active:scale-95"
+          >
+             <Download size={18}/> Descargar Excel
+          </button>
           <button 
              onClick={handleGlobalAudit}
              disabled={store.isProcessingBatch}
