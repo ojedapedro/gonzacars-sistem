@@ -178,54 +178,63 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reiniciar el input para permitir volver a seleccionar el mismo archivo si es necesario
+    // Reiniciar el input para permitir volver a seleccionar el mismo archivo
     e.target.value = '';
+
+    if (typeof XLSX === 'undefined') {
+        alert("Error: La librería XLSX no está cargada. Verifique su conexión a internet.");
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
         try {
             const data = evt.target?.result;
-            // Use XLSX to read (supports both .csv and .xlsx)
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Leer con defval para obtener celdas vacías como strings vacíos
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
             const updates: {product: Product, newQuantity: number}[] = [];
 
             jsonData.forEach((row: any) => {
-                // Mapear columnas según el formato de descarga de Excel
-                // Intentar encontrar las llaves ignorando mayúsculas/minúsculas si es necesario
-                const getRowValue = (keys: string[]) => {
-                    for (const k of keys) {
-                        if (row[k] !== undefined) return row[k];
-                        // Intento case-insensitive básico
-                        const foundKey = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
-                        if (foundKey) return row[foundKey];
-                    }
-                    return undefined;
+                // 1. Normalizar claves (ignorar mayúsculas/espacios)
+                const normalizedRow: any = {};
+                Object.keys(row).forEach(key => {
+                    const cleanKey = key.trim().toLowerCase();
+                    normalizedRow[cleanKey] = row[key];
+                });
+
+                // 2. Mapeo inteligente de columnas
+                const barcode = normalizedRow['código de barras'] || normalizedRow['codigo de barras'] || normalizedRow['barcode'] || normalizedRow['código'] || normalizedRow['codigo'] || normalizedRow['id'];
+                const name = normalizedRow['producto'] || normalizedRow['nombre'] || normalizedRow['name'] || normalizedRow['descripción'] || normalizedRow['descripcion'];
+                
+                // Prioridad a 'cantidad contada' (formato de descarga)
+                let quantityVal = normalizedRow['cantidad contada'];
+                
+                // Fallbacks si no existe la columna principal (ej. CSV simple)
+                if (quantityVal === undefined || quantityVal === '') {
+                    quantityVal = normalizedRow['cantidad'] || normalizedRow['stock'] || normalizedRow['quantity'];
                 }
 
-                const barcode = getRowValue(['Código de Barras', 'Codigo', 'Barcode', 'id']);
-                const name = getRowValue(['Producto', 'Nombre', 'Name', 'name', 'descripcion']);
-                
-                // Buscar la cantidad en la columna "Cantidad Contada" (formato de descarga)
-                let quantityVal = getRowValue(['Cantidad Contada', 'Cantidad', 'Quantity', 'cantidad', 'stock']);
-
-                // Si no hay valor o está vacío, saltar (así no se ponen en 0 items no contados)
+                // Si no hay valor numérico válido, saltar
                 if (quantityVal === undefined || quantityVal === '' || quantityVal === null) return;
 
-                const quantity = Number(String(quantityVal).trim()); // Asegurar conversión a número limpia
+                const quantity = Number(String(quantityVal).trim());
                 if (isNaN(quantity)) return;
 
                 let product: Product | undefined;
 
-                // 1. Buscar por Código de Barras (Exacto)
+                // 3. Buscar Producto
+                // Primero por Código de Barras (Exacto)
                 if (barcode) {
-                    product = store.inventory.find((p: Product) => String(p.barcode).trim() === String(barcode).trim());
+                    const searchBarcode = String(barcode).trim();
+                    product = store.inventory.find((p: Product) => String(p.barcode).trim() === searchBarcode);
                 }
 
-                // 2. Buscar por Nombre (Exacto o insensible a mayúsculas)
+                // Segundo por Nombre (Flexible)
                 if (!product && name) {
                     const cleanName = String(name).trim().toLowerCase();
                     product = store.inventory.find((p: Product) => p.name.trim().toLowerCase() === cleanName);
@@ -237,14 +246,14 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
             });
 
             if (updates.length === 0) {
-                alert("Archivo leído correctamente, pero NO se encontraron productos coincidentes.\n\nVerifique:\n1. Que los 'Códigos de Barras' o 'Nombres' coincidan con el sistema.\n2. Que haya ingresado valores en la columna 'Cantidad Contada'.");
+                alert("Archivo procesado pero no se encontraron coincidencias.\n\nVerifique:\n1. Que los encabezados sean 'Código de Barras' y 'Cantidad Contada'.\n2. Que haya ingresado cantidades.\n3. Que los códigos/nombres existan en el sistema.");
             } else {
                 setBulkPreview(updates);
             }
 
         } catch (error) {
             console.error("Error parsing file:", error);
-            alert("Error al leer el archivo. Asegúrese de usar el formato de Excel descargado (.xlsx) o un CSV válido.");
+            alert("Error al procesar el archivo. Asegúrese de usar un formato Excel (.xlsx) o CSV válido.");
         }
     };
     reader.readAsArrayBuffer(file);

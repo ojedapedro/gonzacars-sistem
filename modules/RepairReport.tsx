@@ -17,7 +17,8 @@ import {
   ArrowDownCircle,
   Receipt,
   PenTool,
-  Check
+  Check,
+  History
 } from 'lucide-react';
 import { VehicleRepair, RepairItem, PaymentMethod, Product, ServiceStatus, Installment } from '../types';
 
@@ -412,12 +413,12 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* 3. TICKET DE ABONO SUELTO (PRINT ONLY) - Detailed Statement */}
+      {/* 3. ESTADO DE CUENTA DETALLADO (PRINT ONLY) - Abono Mode */}
       {lastInstallment && currentRepair && printMode === 'abono' && (
         <div className="hidden print:block print-only bg-white text-slate-900 p-6 font-mono text-[11px] leading-tight w-full max-w-[80mm] mx-auto">
           <div className="text-center mb-4">
             <img src={LOGO_URL} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain grayscale" />
-            <h3 className="font-black text-sm uppercase">Comprobante de Abono</h3>
+            <h3 className="font-black text-sm uppercase">Estado de Cuenta</h3>
             <p className="font-bold">Gonzacars C.A.</p>
             <p>RIF: J-50030426-9</p>
             <p className="text-[9px] mt-1">Av. Bolivar, Valencia</p>
@@ -426,7 +427,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
           <div className="border-y border-dashed border-slate-400 py-3 my-4 space-y-1 text-[10px]">
             <div className="flex justify-between">
                <span>FECHA:</span>
-               <span>{new Date(lastInstallment.date).toLocaleString()}</span>
+               <span>{new Date().toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
                <span>CLIENTE:</span>
@@ -437,34 +438,41 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
                <span className="font-bold">{currentRepair.plate.toUpperCase()}</span>
             </div>
             <div className="flex justify-between">
-               <span>MÉTODO:</span>
-               <span className="uppercase">{lastInstallment.method}</span>
+               <span>ORDEN:</span>
+               <span className="font-bold">#{currentRepair.id.substring(0,6).toUpperCase()}</span>
             </div>
           </div>
 
-          <div className="space-y-2 mb-4">
-             <div className="flex justify-between text-[10px]">
-                <span>TOTAL SERVICIO:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
-             </div>
-             <div className="flex justify-between text-[10px]">
-                <span>ABONADO (PREV + ESTE):</span>
-                <span>${calculatePaid().toFixed(2)}</span>
+          <div className="space-y-4 mb-4">
+             <p className="text-[9px] font-bold uppercase border-b border-slate-200 mb-1">Historial de Pagos</p>
+             <div className="space-y-1">
+               {(currentRepair.installments || []).map((inst, idx) => (
+                 <div key={idx} className="flex justify-between text-[10px]">
+                    <span className="text-slate-500">{new Date(inst.date).toLocaleDateString()}</span>
+                    <span className="uppercase truncate max-w-[80px]">{inst.method}</span>
+                    <span className="font-bold">${inst.amount.toFixed(2)}</span>
+                 </div>
+               ))}
              </div>
           </div>
 
-          <div className="flex justify-between font-black text-sm mt-2 bg-slate-100 p-2 rounded border border-slate-200">
-            <span>ABONO ACTUAL:</span>
-            <span>${lastInstallment.amount.toFixed(2)}</span>
-          </div>
-          
-          <div className="border-t-2 border-dashed border-slate-900 pt-3 mt-4 flex justify-between font-black text-xs">
-            <span>SALDO PENDIENTE:</span>
-            <span>${Math.max(0, calculateBalance()).toFixed(2)}</span>
+          <div className="border-t-2 border-dashed border-slate-900 pt-3 mt-4 space-y-1 font-bold text-xs">
+            <div className="flex justify-between">
+                <span>PRESUPUESTO TOTAL:</span>
+                <span>${calculateTotal().toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+                <span>TOTAL ABONADO:</span>
+                <span>-${calculatePaid().toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between mt-2 pt-2 border-t border-slate-200 text-sm font-black">
+                <span>SALDO PENDIENTE:</span>
+                <span>${Math.max(0, calculateBalance()).toFixed(2)}</span>
+            </div>
           </div>
           
           <div className="text-center mt-6 border-t border-slate-200 pt-4 text-[9px] uppercase font-bold">
-            <p>Este documento es un comprobante de pago parcial.</p>
+            <p>Este documento certifica el estado de cuenta actual.</p>
             <p className="mt-1">¡Gracias por su preferencia!</p>
           </div>
         </div>
@@ -707,53 +715,51 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
         </div>
       )}
 
-      {/* MODAL RECIBO ABONO (RESULTADO) */}
+      {/* MODAL ESTADO DE CUENTA (CONFIRMACIÓN ABONO) */}
       {showAbonoReceipt && lastInstallment && (
         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl flex items-center justify-center z-[110] p-4 print:hidden">
           <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in duration-300 flex flex-col">
             {/* Header */}
             <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
-               <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Comprobante de Pago</h3>
+               <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Estado de Cuenta</h3>
                <button onClick={() => setShowAbonoReceipt(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             
             {/* Content "Statement" */}
-            <div className="p-8 bg-white space-y-6">
+            <div className="p-8 bg-white space-y-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
                <div className="text-center">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{new Date(lastInstallment.date).toLocaleDateString()} - {new Date(lastInstallment.date).toLocaleTimeString()}</p>
                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter">${lastInstallment.amount.toFixed(2)}</h2>
                   <span className="inline-block mt-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
-                    Abono Recibido
+                    Abono Registrado
                   </span>
                </div>
 
-               <div className="space-y-3 pt-6 border-t border-dashed border-slate-200">
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-[10px] space-y-2">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                     <span className="text-slate-400 font-bold uppercase flex items-center gap-2"><History size={12}/> Historial de Pagos</span>
+                  </div>
+                  {(currentRepair?.installments || []).map((inst, i) => (
+                    <div key={i} className="flex justify-between">
+                       <span className="text-slate-500">{new Date(inst.date).toLocaleDateString()}</span>
+                       <span className="font-bold text-slate-700 uppercase">{inst.method}</span>
+                       <span className="font-black text-slate-900">${inst.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+               </div>
+
+               <div className="space-y-3 pt-2">
                   <div className="flex justify-between text-xs">
-                     <span className="font-bold text-slate-500 uppercase">Total Servicio</span>
+                     <span className="font-bold text-slate-500 uppercase">Costo Total Servicio</span>
                      <span className="font-black text-slate-900">${calculateTotal().toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                     <span className="font-bold text-slate-500 uppercase">Abonado (Inc. este pago)</span>
+                     <span className="font-bold text-slate-500 uppercase">Total Abonado</span>
                      <span className="font-black text-emerald-600">-${calculatePaid().toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
-                     <span className="font-black text-slate-800 uppercase">Saldo Restante</span>
+                  <div className="flex justify-between text-lg pt-4 border-t-2 border-dashed border-slate-100">
+                     <span className="font-black text-slate-800 uppercase">Saldo Pendiente</span>
                      <span className="font-black text-blue-600">${calculateBalance().toFixed(2)}</span>
-                  </div>
-               </div>
-
-               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-[10px] space-y-1">
-                  <div className="flex justify-between">
-                     <span className="text-slate-400 font-bold uppercase">Cliente:</span>
-                     <span className="font-black text-slate-700 uppercase">{currentRepair?.ownerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                     <span className="text-slate-400 font-bold uppercase">Vehículo:</span>
-                     <span className="font-black text-slate-700 uppercase">{currentRepair?.plate}</span>
-                  </div>
-                  <div className="flex justify-between">
-                     <span className="text-slate-400 font-bold uppercase">Método:</span>
-                     <span className="font-black text-slate-700 uppercase">{lastInstallment.method}</span>
                   </div>
                </div>
             </div>
@@ -761,7 +767,7 @@ const RepairReport: React.FC<{ store: any }> = ({ store }) => {
             {/* Footer Actions */}
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
                <button onClick={() => { handlePrint('abono'); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all shadow-lg">
-                  <Printer size={16}/> Imprimir
+                  <Printer size={16}/> Imprimir Estado de Cuenta
                </button>
             </div>
           </div>
