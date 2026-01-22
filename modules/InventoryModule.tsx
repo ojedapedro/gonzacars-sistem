@@ -180,40 +180,58 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-        const text = evt.target?.result as string;
-        const lines = text.split('\n');
-        const updates: {product: Product, newQuantity: number}[] = [];
+        try {
+            const data = evt.target?.result;
+            // Use XLSX to read (supports both .csv and .xlsx)
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        // Skip header if present (simple heuristic: if first col is not a number/code but string 'barcode' or 'id')
-        const startIndex = lines[0].toLowerCase().includes('barcode') || lines[0].toLowerCase().includes('cantidad') ? 1 : 0;
+            const updates: {product: Product, newQuantity: number}[] = [];
 
-        for (let i = startIndex; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            
-            // Expected CSV format: barcode,quantity
-            // OR name,quantity (fallback)
-            const parts = line.split(',');
-            if (parts.length < 2) continue;
+            jsonData.forEach((row: any) => {
+                // Mapear columnas según el formato de descarga de Excel
+                const barcode = row['Código de Barras'] || row['Codigo'] || row['Barcode'] || row['barcode'];
+                const name = row['Producto'] || row['Nombre'] || row['Name'] || row['name'];
+                
+                // Buscar la cantidad en la columna "Cantidad Contada" (formato de descarga)
+                // O fallbacks comunes para CSVs simples
+                let quantityVal = row['Cantidad Contada'];
+                if (quantityVal === undefined) {
+                    quantityVal = row['Cantidad'] || row['Quantity'] || row['cantidad'] || row['quantity'] || row['stock'];
+                }
 
-            const identifier = parts[0].trim().replace(/['"]/g, '');
-            const quantity = Number(parts[1].trim());
+                // Si no hay valor o está vacío, saltar (así no se ponen en 0 items no contados)
+                if (quantityVal === undefined || quantityVal === '' || quantityVal === null) return;
 
-            if (isNaN(quantity)) continue;
+                const quantity = Number(quantityVal);
+                if (isNaN(quantity)) return;
 
-            // Try to find product by barcode first, then name
-            const product = store.inventory.find((p: Product) => 
-                String(p.barcode) === identifier || 
-                p.name.toLowerCase() === identifier.toLowerCase()
-            );
+                let product: Product | undefined;
 
-            if (product) {
-                updates.push({ product, newQuantity: quantity });
-            }
+                // 1. Buscar por Código de Barras (Exacto)
+                if (barcode) {
+                    product = store.inventory.find((p: Product) => String(p.barcode).trim() === String(barcode).trim());
+                }
+
+                // 2. Buscar por Nombre (Exacto o insensible a mayúsculas)
+                if (!product && name) {
+                    const cleanName = String(name).trim().toLowerCase();
+                    product = store.inventory.find((p: Product) => p.name.trim().toLowerCase() === cleanName);
+                }
+
+                if (product) {
+                    updates.push({ product, newQuantity: quantity });
+                }
+            });
+            setBulkPreview(updates);
+        } catch (error) {
+            console.error("Error parsing file:", error);
+            alert("Error al leer el archivo. Asegúrese de usar el formato de Excel descargado o un CSV válido.");
         }
-        setBulkPreview(updates);
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const processBulkUpdate = () => {
@@ -307,7 +325,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
              onClick={() => setShowBulkModal(true)}
              className="bg-emerald-600 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
           >
-             <FileSpreadsheet size={18}/> Carga Masiva (CSV)
+             <FileSpreadsheet size={18}/> Carga Masiva
           </button>
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
@@ -516,7 +534,7 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                   <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
                      <FileSpreadsheet className="text-emerald-500" /> Carga Masiva de Stock
                   </h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Importar inventario físico desde CSV</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Importar inventario físico</p>
                 </div>
                 <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white transition-colors">
                    <X size={24} />
@@ -527,11 +545,11 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                 {bulkPreview.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 border-4 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
                         <UploadCloud size={64} className="text-slate-300 mb-4" />
-                        <h4 className="text-lg font-black text-slate-700 uppercase">Subir Archivo .CSV</h4>
-                        <p className="text-xs text-slate-400 font-medium mb-6">Formato requerido: Código de Barras, Cantidad</p>
+                        <h4 className="text-lg font-black text-slate-700 uppercase">Subir Archivo de Inventario</h4>
+                        <p className="text-xs text-slate-400 font-medium mb-6">Compatible con formato de descarga Excel ("Cantidad Contada")</p>
                         <input 
                             type="file" 
-                            accept=".csv"
+                            accept=".csv, .xlsx, .xls"
                             ref={fileInputRef}
                             onChange={handleFileUpload}
                             className="hidden"
