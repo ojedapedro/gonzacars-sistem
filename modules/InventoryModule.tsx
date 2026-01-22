@@ -178,6 +178,9 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reiniciar el input para permitir volver a seleccionar el mismo archivo si es necesario
+    e.target.value = '';
+
     const reader = new FileReader();
     reader.onload = (evt) => {
         try {
@@ -186,26 +189,33 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
             const updates: {product: Product, newQuantity: number}[] = [];
 
             jsonData.forEach((row: any) => {
                 // Mapear columnas según el formato de descarga de Excel
-                const barcode = row['Código de Barras'] || row['Codigo'] || row['Barcode'] || row['barcode'];
-                const name = row['Producto'] || row['Nombre'] || row['Name'] || row['name'];
+                // Intentar encontrar las llaves ignorando mayúsculas/minúsculas si es necesario
+                const getRowValue = (keys: string[]) => {
+                    for (const k of keys) {
+                        if (row[k] !== undefined) return row[k];
+                        // Intento case-insensitive básico
+                        const foundKey = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
+                        if (foundKey) return row[foundKey];
+                    }
+                    return undefined;
+                }
+
+                const barcode = getRowValue(['Código de Barras', 'Codigo', 'Barcode', 'id']);
+                const name = getRowValue(['Producto', 'Nombre', 'Name', 'name', 'descripcion']);
                 
                 // Buscar la cantidad en la columna "Cantidad Contada" (formato de descarga)
-                // O fallbacks comunes para CSVs simples
-                let quantityVal = row['Cantidad Contada'];
-                if (quantityVal === undefined) {
-                    quantityVal = row['Cantidad'] || row['Quantity'] || row['cantidad'] || row['quantity'] || row['stock'];
-                }
+                let quantityVal = getRowValue(['Cantidad Contada', 'Cantidad', 'Quantity', 'cantidad', 'stock']);
 
                 // Si no hay valor o está vacío, saltar (así no se ponen en 0 items no contados)
                 if (quantityVal === undefined || quantityVal === '' || quantityVal === null) return;
 
-                const quantity = Number(quantityVal);
+                const quantity = Number(String(quantityVal).trim()); // Asegurar conversión a número limpia
                 if (isNaN(quantity)) return;
 
                 let product: Product | undefined;
@@ -225,10 +235,16 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
                     updates.push({ product, newQuantity: quantity });
                 }
             });
-            setBulkPreview(updates);
+
+            if (updates.length === 0) {
+                alert("Archivo leído correctamente, pero NO se encontraron productos coincidentes.\n\nVerifique:\n1. Que los 'Códigos de Barras' o 'Nombres' coincidan con el sistema.\n2. Que haya ingresado valores en la columna 'Cantidad Contada'.");
+            } else {
+                setBulkPreview(updates);
+            }
+
         } catch (error) {
             console.error("Error parsing file:", error);
-            alert("Error al leer el archivo. Asegúrese de usar el formato de Excel descargado o un CSV válido.");
+            alert("Error al leer el archivo. Asegúrese de usar el formato de Excel descargado (.xlsx) o un CSV válido.");
         }
     };
     reader.readAsArrayBuffer(file);
