@@ -200,41 +200,39 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
             const updates: {product: Product, newQuantity: number}[] = [];
 
             jsonData.forEach((row: any) => {
-                // 1. Normalizar claves (ignorar mayúsculas/espacios)
-                const normalizedRow: any = {};
-                Object.keys(row).forEach(key => {
-                    const cleanKey = key.trim().toLowerCase();
-                    normalizedRow[cleanKey] = row[key];
-                });
+                // LÓGICA DE MAPEO PARA FORMATO "INVENTARIO FÍSICO"
+                // Columnas esperadas: "Código de Barras", "Producto", "Cantidad Contada"
+                
+                const getColumnValue = (target: string) => {
+                    const key = Object.keys(row).find(k => k.trim().toLowerCase() === target.toLowerCase());
+                    return key ? row[key] : undefined;
+                };
 
-                // 2. Mapeo inteligente de columnas
-                const barcode = normalizedRow['código de barras'] || normalizedRow['codigo de barras'] || normalizedRow['barcode'] || normalizedRow['código'] || normalizedRow['codigo'] || normalizedRow['id'];
-                const name = normalizedRow['producto'] || normalizedRow['nombre'] || normalizedRow['name'] || normalizedRow['descripción'] || normalizedRow['descripcion'];
+                const barcode = getColumnValue('Código de Barras') || getColumnValue('Codigo de Barras');
+                const name = getColumnValue('Producto') || getColumnValue('Nombre');
                 
-                // Prioridad a 'cantidad contada' (formato de descarga)
-                let quantityVal = normalizedRow['cantidad contada'];
-                
-                // Fallbacks si no existe la columna principal (ej. CSV simple)
+                // Buscar la cantidad física ingresada en el Excel
+                let quantityVal = getColumnValue('Cantidad Contada');
+
+                // Si está vacío, intentamos buscar otras columnas comunes por si el usuario editó el header,
+                // pero damos prioridad absoluta a 'Cantidad Contada' del formato oficial.
                 if (quantityVal === undefined || quantityVal === '') {
-                    quantityVal = normalizedRow['cantidad'] || normalizedRow['stock'] || normalizedRow['quantity'];
+                    // Si no hay valor en "Cantidad Contada", IGNORAR LA FILA (asumimos no contado)
+                    return; 
                 }
-
-                // Si no hay valor numérico válido, saltar
-                if (quantityVal === undefined || quantityVal === '' || quantityVal === null) return;
 
                 const quantity = Number(String(quantityVal).trim());
                 if (isNaN(quantity)) return;
 
                 let product: Product | undefined;
 
-                // 3. Buscar Producto
-                // Primero por Código de Barras (Exacto)
+                // 1. Buscar por Código de Barras
                 if (barcode) {
                     const searchBarcode = String(barcode).trim();
                     product = store.inventory.find((p: Product) => String(p.barcode).trim() === searchBarcode);
                 }
 
-                // Segundo por Nombre (Flexible)
+                // 2. Buscar por Nombre
                 if (!product && name) {
                     const cleanName = String(name).trim().toLowerCase();
                     product = store.inventory.find((p: Product) => p.name.trim().toLowerCase() === cleanName);
@@ -246,14 +244,14 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
             });
 
             if (updates.length === 0) {
-                alert("Archivo procesado pero no se encontraron coincidencias.\n\nVerifique:\n1. Que los encabezados sean 'Código de Barras' y 'Cantidad Contada'.\n2. Que haya ingresado cantidades.\n3. Que los códigos/nombres existan en el sistema.");
+                alert("Archivo procesado pero no se encontraron productos para actualizar.\n\nAsegúrese de:\n1. Usar el formato 'Descargar Excel'.\n2. Ingresar valores en la columna 'Cantidad Contada'.\n3. No modificar los nombres de los productos o códigos.");
             } else {
                 setBulkPreview(updates);
             }
 
         } catch (error) {
             console.error("Error parsing file:", error);
-            alert("Error al procesar el archivo. Asegúrese de usar un formato Excel (.xlsx) o CSV válido.");
+            alert("Error al procesar el archivo. Asegúrese de usar un formato Excel (.xlsx) válido.");
         }
     };
     reader.readAsArrayBuffer(file);
