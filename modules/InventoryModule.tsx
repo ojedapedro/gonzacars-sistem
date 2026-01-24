@@ -153,6 +153,8 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
       "Código de Barras": p.barcode || '',
       "Producto": p.name,
       "Categoría": p.category,
+      "Costo": p.cost || 0,
+      "Precio": p.price || 0,
       "Cantidad Teórica": p.quantity,
       "Cantidad Contada": "" // Empty for manual entry
     }));
@@ -164,6 +166,8 @@ const InventoryModule: React.FC<{ store: any }> = ({ store }) => {
       { wch: 20 }, // Barcode
       { wch: 40 }, // Name
       { wch: 20 }, // Category
+      { wch: 12 }, // Cost
+      { wch: 12 }, // Price
       { wch: 15 }, // Theoretical
       { wch: 15 }  // Counted
     ];
