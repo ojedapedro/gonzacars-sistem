@@ -6,6 +6,7 @@ import { improveDiagnosis } from '../lib/gemini';
 
 const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false); // Estado para visualización de carga
   const [formData, setFormData] = useState<Partial<VehicleRepair>>({
     status: 'Ingresado',
     year: new Date().getFullYear(),
@@ -27,17 +28,73 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Función utilitaria para comprimir imágenes
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const maxWidth = 1024; // Máximo ancho permitido
+      const maxHeight = 1024;
+      const reader = new FileReader();
+      
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          // Calcular nuevas dimensiones manteniendo aspecto
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+             resolve(event.target?.result as string); // Fallback si falla canvas
+             return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Comprimir a JPEG calidad 70%
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      setIsCompressing(true);
+      try {
+        const compressedBase64 = await compressImage(file);
         const currentPhotos = formData.evidencePhotos || [];
         if (currentPhotos.length < 4) {
-          setFormData({ ...formData, evidencePhotos: [...currentPhotos, reader.result as string] });
+          setFormData({ ...formData, evidencePhotos: [...currentPhotos, compressedBase64] });
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Error comprimiendo imagen", error);
+        alert("Hubo un error al procesar la imagen. Intente con otra.");
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -61,7 +118,7 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
       createdAt: new Date().toISOString()
     };
     store.addRepair(newRepair);
-    alert('Vehículo registrado correctamente');
+    alert('Vehículo registrado correctamente y sincronizado en la nube.');
     setFormData({ status: 'Ingresado', year: new Date().getFullYear(), items: [], evidencePhotos: [] });
   };
 
@@ -129,9 +186,12 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
               <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                 <Camera size={16} className="text-blue-500" /> Evidencias Visuales
               </label>
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photoCount === 4 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                {photoCount} / 4 Fotos
-              </span>
+              <div className="flex items-center gap-2">
+                  {isCompressing && <span className="text-[10px] text-blue-600 font-bold animate-pulse">Comprimiendo...</span>}
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photoCount === 4 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {photoCount} / 4 Fotos
+                  </span>
+              </div>
             </div>
             
             <div className="grid grid-cols-4 gap-3">
@@ -147,14 +207,22 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
                   </button>
                 </div>
               ))}
-              {photoCount < 4 && (
+              {photoCount < 4 && !isCompressing && (
                 <label className="cursor-pointer flex flex-col items-center justify-center aspect-square border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-white transition-all text-slate-400 hover:text-blue-500 bg-white/50">
                   <Plus size={20} />
                   <span className="text-[8px] font-black uppercase mt-1">Añadir</span>
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
                 </label>
               )}
+               {isCompressing && (
+                <div className="flex flex-col items-center justify-center aspect-square border-2 border-slate-200 rounded-xl bg-slate-50">
+                    <Loader2 className="animate-spin text-blue-500" size={24} />
+                </div>
+              )}
             </div>
+            <p className="text-[9px] text-slate-400 mt-2 text-center">
+                * Las imágenes se comprimen automáticamente para garantizar una sincronización rápida.
+            </p>
           </div>
 
           <div className="relative">
@@ -178,8 +246,13 @@ const RepairRegistration: React.FC<{ store: any }> = ({ store }) => {
             ></textarea>
           </div>
 
-          <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200">
-            <Save size={20}/> Registrar Entrada
+          <button 
+            type="submit" 
+            disabled={isCompressing}
+            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 disabled:opacity-50"
+          >
+            {isCompressing ? <Loader2 className="animate-spin" size={20}/> : <Save size={20}/>} 
+            Registrar Entrada
           </button>
         </form>
       </div>

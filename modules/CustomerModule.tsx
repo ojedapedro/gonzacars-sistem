@@ -112,15 +112,15 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto h-full flex flex-col">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 lg:mb-8 gap-4">
         <div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Gestión de Clientes</h3>
-          <p className="text-slate-500 font-medium">Directorio estratégico y analíticas de lealtad de Gonzacars</p>
+          <h3 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tighter uppercase">Gestión de Clientes</h3>
+          <p className="text-xs lg:text-base text-slate-500 font-medium">Directorio estratégico y analíticas de lealtad de Gonzacars</p>
         </div>
-        <div className="flex gap-4">
-          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm h-fit">
-            <div className="relative w-64">
+        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+          <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm h-fit w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
               <input 
                 type="text" 
@@ -140,7 +140,7 @@ const CustomerModule: React.FC<{ store: any }> = ({ store }) => {
           </div>
           <button 
             onClick={() => setShowAddModal(true)} 
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95"
+            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 w-full sm:w-auto"
           >
             <Plus size={20}/> Nuevo Cliente
           </button>

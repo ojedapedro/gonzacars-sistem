@@ -24,7 +24,9 @@ import {
   Copy,
   Smartphone,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  X
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useGonzacarsStore } from './store';
@@ -46,6 +48,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tempUrl, setTempUrl] = useState(store.sheetsUrl);
   const [localRate, setLocalRate] = useState(store.exchangeRate);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -120,51 +123,51 @@ const App: React.FC = () => {
 
   if (!store.sheetsUrl) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-900 p-6 overflow-y-auto">
-        <div className="w-full max-w-2xl bg-white/5 backdrop-blur-2xl rounded-[3rem] border border-white/10 p-12 text-white animate-in zoom-in duration-500">
-           <div className="text-center mb-10">
-              <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-blue-600/20">
-                <Database size={40} />
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-900 p-4 lg:p-6 overflow-y-auto">
+        <div className="w-full max-w-2xl bg-white/5 backdrop-blur-2xl rounded-[2rem] lg:rounded-[3rem] border border-white/10 p-6 lg:p-12 text-white animate-in zoom-in duration-500 my-auto">
+           <div className="text-center mb-6 lg:mb-10">
+              <div className="w-16 h-16 lg:w-20 lg:h-20 bg-blue-600 rounded-2xl lg:rounded-3xl flex items-center justify-center mx-auto mb-4 lg:mb-6 shadow-2xl shadow-blue-600/20">
+                <Database size={32} className="lg:w-10 lg:h-10" />
               </div>
-              <h2 className="text-4xl font-black uppercase tracking-tighter">Bienvenido a Gonzacars</h2>
-              <p className="text-slate-400 mt-4 font-bold uppercase text-xs tracking-widest leading-relaxed">
+              <h2 className="text-2xl lg:text-4xl font-black uppercase tracking-tighter">Bienvenido a Gonzacars</h2>
+              <p className="text-slate-400 mt-2 lg:mt-4 font-bold uppercase text-[10px] lg:text-xs tracking-widest leading-relaxed">
                 Para comenzar en este dispositivo, necesitamos vincular tu base de datos de Google Sheets.
               </p>
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5 space-y-4">
-                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-blue-400">
-                    <Smartphone size={20} />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8 mb-6 lg:mb-10">
+              <div className="bg-white/5 p-4 lg:p-6 rounded-2xl lg:rounded-3xl border border-white/5 space-y-2 lg:space-y-4">
+                 <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 rounded-xl flex items-center justify-center text-blue-400">
+                    <Smartphone size={16} className="lg:w-5 lg:h-5" />
                  </div>
-                 <h3 className="font-black uppercase text-sm tracking-tight">Si ya lo usas en otro PC</h3>
-                 <p className="text-xs text-slate-400 leading-relaxed">Entra en el Escritorio desde el otro PC, haz clic en <b>"Compartir Acceso"</b> y copia el enlace aquí.</p>
+                 <h3 className="font-black uppercase text-xs lg:text-sm tracking-tight">Si ya lo usas en otro PC</h3>
+                 <p className="text-[10px] lg:text-xs text-slate-400 leading-relaxed">Entra en el Escritorio desde el otro PC, haz clic en <b>"Compartir Acceso"</b> y copia el enlace aquí.</p>
               </div>
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5 space-y-4">
-                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-purple-400">
-                    <ExternalLink size={20} />
+              <div className="bg-white/5 p-4 lg:p-6 rounded-2xl lg:rounded-3xl border border-white/5 space-y-2 lg:space-y-4">
+                 <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/10 rounded-xl flex items-center justify-center text-purple-400">
+                    <ExternalLink size={16} className="lg:w-5 lg:h-5" />
                  </div>
-                 <h3 className="font-black uppercase text-sm tracking-tight">Si eres nuevo</h3>
-                 <p className="text-xs text-slate-400 leading-relaxed">Crea un Google Sheet, pega el script de la documentación y publica como "Aplicación Web".</p>
+                 <h3 className="font-black uppercase text-xs lg:text-sm tracking-tight">Si eres nuevo</h3>
+                 <p className="text-[10px] lg:text-xs text-slate-400 leading-relaxed">Crea un Google Sheet, pega el script de la documentación y publica como "Aplicación Web".</p>
               </div>
            </div>
 
-           <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">URL de tu Apps Script</label>
+           <div className="space-y-3 lg:space-y-4">
+              <label className="text-[9px] lg:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">URL de tu Apps Script</label>
               <input 
                 type="text" 
-                className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:ring-4 focus:ring-blue-500/50 transition-all text-sm"
+                className="w-full bg-white/10 border border-white/10 rounded-xl lg:rounded-2xl px-4 lg:px-6 py-3 lg:py-4 text-white font-bold outline-none focus:ring-4 focus:ring-blue-500/50 transition-all text-xs lg:text-sm"
                 placeholder="https://script.google.com/macros/s/.../exec"
                 value={tempUrl}
                 onChange={(e) => setTempUrl(e.target.value)}
               />
               <button 
                 onClick={() => store.saveUrl(tempUrl)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-[0.2em] py-5 rounded-2xl shadow-2xl shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] lg:text-xs tracking-[0.2em] py-4 lg:py-5 rounded-xl lg:rounded-2xl shadow-2xl shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3"
               >
-                Vincular Dispositivo <ChevronRight size={18}/>
+                Vincular Dispositivo <ChevronRight size={16} className="lg:w-[18px] lg:h-[18px]"/>
               </button>
-              <p className="text-center text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-6">Tu privacidad es total. No almacenamos tus credenciales en ningún servidor externo.</p>
+              <p className="text-center text-[8px] lg:text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-4 lg:mt-6">Tu privacidad es total. No almacenamos tus credenciales en ningún servidor externo.</p>
            </div>
         </div>
       </div>
@@ -173,30 +176,30 @@ const App: React.FC = () => {
 
   if (!store.currentUser) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-900 relative overflow-hidden">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-900 relative overflow-hidden p-4">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px]"></div>
           <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-purple-600 rounded-full blur-[100px]"></div>
         </div>
 
-        <div className="w-full max-w-md p-10 bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 shadow-2xl relative z-10 animate-in fade-in zoom-in duration-500">
-          <div className="text-center mb-10">
-            <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl border border-white/10 p-2">
+        <div className="w-full max-w-md p-6 lg:p-10 bg-white/5 backdrop-blur-xl rounded-[2rem] lg:rounded-[3rem] border border-white/10 shadow-2xl relative z-10 animate-in fade-in zoom-in duration-500">
+          <div className="text-center mb-6 lg:mb-10">
+            <div className="w-20 h-20 lg:w-24 lg:h-24 bg-white/10 rounded-2xl lg:rounded-3xl flex items-center justify-center mx-auto mb-4 lg:mb-6 shadow-2xl border border-white/10 p-2">
               <img src={LOGO_URL} alt="Gonzacars Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Gonzacars C.A.</h1>
-            <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Sistema de Gestión Integral</p>
+            <h1 className="text-2xl lg:text-3xl font-black text-white uppercase tracking-tighter">Gonzacars C.A.</h1>
+            <p className="text-slate-400 font-bold uppercase text-[9px] lg:text-[10px] tracking-[0.2em] mt-2">Sistema de Gestión Integral</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-4 lg:space-y-6">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuario</label>
+              <label className="text-[9px] lg:text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuario</label>
               <div className="relative">
                 <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                 <input 
                   required
                   type="text" 
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-bold"
+                  className="w-full pl-12 pr-4 py-3 lg:py-4 bg-white/5 border border-white/10 rounded-xl lg:rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-bold text-sm"
                   placeholder="admin, vendedor, cajero..."
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -205,13 +208,13 @@ const App: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contraseña</label>
+              <label className="text-[9px] lg:text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contraseña</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                 <input 
                   required
                   type="password" 
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-bold"
+                  className="w-full pl-12 pr-4 py-3 lg:py-4 bg-white/5 border border-white/10 rounded-xl lg:rounded-2xl text-white outline-none focus:border-blue-500 transition-all font-bold text-sm"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -223,13 +226,13 @@ const App: React.FC = () => {
               <p className="text-red-400 text-center text-xs font-black uppercase tracking-widest animate-bounce">Credenciales Inválidas</p>
             )}
 
-            <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-blue-500/10 transition-all active:scale-95 group">
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 lg:py-5 rounded-xl lg:rounded-2xl font-black uppercase text-[10px] lg:text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-blue-500/10 transition-all active:scale-95 group">
               Acceder al Sistema <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform"/>
             </button>
             <button 
               type="button"
               onClick={() => store.saveUrl('')}
-              className="w-full text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors"
+              className="w-full text-[8px] lg:text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors"
             >
               Cambiar Base de Datos
             </button>
@@ -293,20 +296,20 @@ const App: React.FC = () => {
               value={store.customers.length.toString()}
               icon={<UserRound className="text-purple-500" />}
             />
-            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+            <div className="bg-slate-900 p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
               <Coins className="absolute -bottom-6 -right-6 text-white/5 group-hover:scale-110 transition-transform" size={120} />
               <div className="relative z-10">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Tasa de Cambio Manual (Bs/$)</p>
+                <p className="text-[9px] lg:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Tasa de Cambio Manual (Bs/$)</p>
                 <div className="flex items-center gap-3">
                   <input 
                     type="number" 
-                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-2xl font-black outline-none focus:border-blue-500 transition-all"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl lg:rounded-2xl px-4 py-3 text-xl lg:text-2xl font-black outline-none focus:border-blue-500 transition-all"
                     value={localRate}
                     onChange={(e) => setLocalRate(Number(e.target.value))}
                   />
                   <button 
                     onClick={handleRateUpdate}
-                    className="p-3 bg-blue-600 rounded-2xl hover:bg-blue-700 transition-all shadow-lg"
+                    className="p-3 bg-blue-600 rounded-xl lg:rounded-2xl hover:bg-blue-700 transition-all shadow-lg"
                     title="Actualizar Tasa"
                   >
                     <RefreshCw size={20} />
@@ -316,17 +319,17 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden h-96">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            <div className="lg:col-span-8 bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden h-80 lg:h-96">
                <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                    <h3 className="text-lg lg:text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                         <TrendingUp className="text-blue-600" size={24}/> Resumen Mensual de Operaciones
                     </h3>
-                    <p className="text-sm text-slate-500 font-medium">Ingresos diarios (Ventas + Taller) - Últimos 14 días</p>
+                    <p className="text-xs lg:text-sm text-slate-500 font-medium">Ingresos diarios (Ventas + Taller) - Últimos 14 días</p>
                   </div>
                </div>
-               <div className="h-64 w-full">
+               <div className="h-56 lg:h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
                       <defs>
@@ -368,8 +371,8 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            <div className="lg:col-span-4 bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
-              <h3 className="text-xl font-black text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-tighter relative z-10">
+            <div className="lg:col-span-4 bg-white p-6 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
+              <h3 className="text-lg lg:text-xl font-black text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-tighter relative z-10">
                   <Database className="text-blue-600" size={20}/> Cloud DB Config
               </h3>
               <p className="text-xs text-slate-500 mb-6 font-medium relative z-10">URL de Apps Script para sincronización en la nube.</p>
@@ -438,34 +441,54 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
-      <aside className="w-72 bg-slate-950 text-white flex flex-col no-print border-r border-white/5 relative">
-        <div className="p-8 flex items-center gap-4 border-b border-white/5">
-          <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center p-2 shadow-xl border border-white/5">
-            <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" />
+    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans relative">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 bg-slate-950 text-white flex flex-col border-r border-white/5 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-6 lg:p-8 flex items-center justify-between border-b border-white/5">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/5 rounded-2xl flex items-center justify-center p-2 shadow-xl border border-white/5">
+              <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <span className="font-black text-base lg:text-lg tracking-tighter uppercase leading-none block">Gonzacars</span>
+              <span className="text-[8px] lg:text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] mt-1 block">Taller y Repuestos</span>
+            </div>
           </div>
-          <div>
-            <span className="font-black text-lg tracking-tighter uppercase leading-none block">Gonzacars</span>
-            <span className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] mt-1 block">Taller y Repuestos</span>
-          </div>
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="lg:hidden p-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
-          <NavItem icon={<LayoutDashboard size={20}/>} label="Escritorio" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} visible={hasPermission('dashboard')} />
+          <NavItem icon={<LayoutDashboard size={20}/>} label="Escritorio" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} visible={hasPermission('dashboard')} />
           <MenuHeader label="Base de Datos" />
-          <NavItem icon={<UserRound size={20}/>} label="Clientes" active={activeTab === 'customers'} onClick={() => setActiveTab('customers')} visible={hasPermission('customers')} />
+          <NavItem icon={<UserRound size={20}/>} label="Clientes" active={activeTab === 'customers'} onClick={() => { setActiveTab('customers'); setIsMobileMenuOpen(false); }} visible={hasPermission('customers')} />
           <MenuHeader label="Servicio Técnico" />
-          <NavItem icon={<Wrench size={20}/>} label="Reg. Vehículo" active={activeTab === 'repair-reg'} onClick={() => setActiveTab('repair-reg')} visible={hasPermission('repair-reg')} />
-          <NavItem icon={<ClipboardList size={20}/>} label="Informes" active={activeTab === 'repair-rep'} onClick={() => setActiveTab('repair-rep')} visible={hasPermission('repair-rep')} />
+          <NavItem icon={<Wrench size={20}/>} label="Reg. Vehículo" active={activeTab === 'repair-reg'} onClick={() => { setActiveTab('repair-reg'); setIsMobileMenuOpen(false); }} visible={hasPermission('repair-reg')} />
+          <NavItem icon={<ClipboardList size={20}/>} label="Informes" active={activeTab === 'repair-rep'} onClick={() => { setActiveTab('repair-rep'); setIsMobileMenuOpen(false); }} visible={hasPermission('repair-rep')} />
           <MenuHeader label="Unidad Comercial" />
-          <NavItem icon={<ShoppingCart size={20}/>} label="Punto de Venta" active={activeTab === 'sales'} onClick={() => setActiveTab('sales')} visible={hasPermission('sales')} />
-          <NavItem icon={<Package size={20}/>} label="Inventario" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} visible={hasPermission('inventory')} />
-          <NavItem icon={<Truck size={20}/>} label="Compras" active={activeTab === 'purchases'} onClick={() => setActiveTab('purchases')} visible={hasPermission('purchases')} />
+          <NavItem icon={<ShoppingCart size={20}/>} label="Punto de Venta" active={activeTab === 'sales'} onClick={() => { setActiveTab('sales'); setIsMobileMenuOpen(false); }} visible={hasPermission('sales')} />
+          <NavItem icon={<Package size={20}/>} label="Inventario" active={activeTab === 'inventory'} onClick={() => { setActiveTab('inventory'); setIsMobileMenuOpen(false); }} visible={hasPermission('inventory')} />
+          <NavItem icon={<Truck size={20}/>} label="Compras" active={activeTab === 'purchases'} onClick={() => { setActiveTab('purchases'); setIsMobileMenuOpen(false); }} visible={hasPermission('purchases')} />
           <MenuHeader label="Administración" />
-          <NavItem icon={<BarChart3 size={20}/>} label="Finanzas" active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} visible={hasPermission('finance')} />
-          <NavItem icon={<Wallet size={20}/>} label="Gastos" active={activeTab === 'expenses'} onClick={() => setActiveTab('expenses')} visible={hasPermission('expenses')} />
-          <NavItem icon={<Users size={20}/>} label="Nómina" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} visible={hasPermission('payroll')} />
-          <NavItem icon={<ShieldCheck size={20}/>} label="Usuarios" active={activeTab === 'user-mgmt'} onClick={() => setActiveTab('user-mgmt')} visible={hasPermission('user-mgmt')} />
+          <NavItem icon={<BarChart3 size={20}/>} label="Finanzas" active={activeTab === 'finance'} onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} visible={hasPermission('finance')} />
+          <NavItem icon={<Wallet size={20}/>} label="Gastos" active={activeTab === 'expenses'} onClick={() => { setActiveTab('expenses'); setIsMobileMenuOpen(false); }} visible={hasPermission('expenses')} />
+          <NavItem icon={<Users size={20}/>} label="Nómina" active={activeTab === 'payroll'} onClick={() => { setActiveTab('payroll'); setIsMobileMenuOpen(false); }} visible={hasPermission('payroll')} />
+          <NavItem icon={<ShieldCheck size={20}/>} label="Usuarios" active={activeTab === 'user-mgmt'} onClick={() => { setActiveTab('user-mgmt'); setIsMobileMenuOpen(false); }} visible={hasPermission('user-mgmt')} />
         </nav>
 
         <div className="p-6 border-t border-white/5 bg-slate-900/50">
@@ -475,22 +498,30 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 no-print z-10">
-          <div className="flex flex-col">
-            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">{activeTab.replace('-', ' ')}</h2>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estado: Operativo</span>
+      <main className="flex-1 flex flex-col overflow-hidden relative w-full">
+        <header className="h-16 lg:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-10 no-print z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex flex-col">
+              <h2 className="text-base lg:text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">{activeTab.replace('-', ' ')}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                <span className="text-[8px] lg:text-[9px] font-black text-slate-400 uppercase tracking-widest hidden sm:inline">Estado: Operativo</span>
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasa Bancaria</span>
-            <span className="text-sm font-black text-blue-600 tracking-tight">{store.exchangeRate.toFixed(2)} Bs</span>
+            <span className="text-[8px] lg:text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasa Bancaria</span>
+            <span className="text-xs lg:text-sm font-black text-blue-600 tracking-tight">{store.exchangeRate.toFixed(2)} Bs</span>
           </div>
         </header>
         
-        <div className="flex-1 overflow-y-auto bg-slate-50/30 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto bg-slate-50/30 custom-scrollbar w-full">
           {renderModule()}
         </div>
       </main>
@@ -516,12 +547,12 @@ const NavItem: React.FC<{ icon: React.ReactNode, label: string, active: boolean,
 };
 
 const DashboardCard: React.FC<{ title: string, value: string, icon: React.ReactNode }> = ({ title, value, icon }) => (
-  <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 flex justify-between items-start group hover:border-blue-200 transition-all">
+  <div className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] shadow-sm border border-slate-200 flex justify-between items-start group hover:border-blue-200 transition-all">
     <div>
-      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2 group-hover:text-slate-600 transition-colors">{title}</p>
-      <h3 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{value}</h3>
+      <p className="text-slate-400 text-[9px] lg:text-[10px] font-black uppercase tracking-widest mb-2 group-hover:text-slate-600 transition-colors">{title}</p>
+      <h3 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none">{value}</h3>
     </div>
-    <div className="p-4 bg-slate-50 rounded-2xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
+    <div className="p-3 lg:p-4 bg-slate-50 rounded-2xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
       {icon}
     </div>
   </div>
