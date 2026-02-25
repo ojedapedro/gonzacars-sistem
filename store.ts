@@ -28,8 +28,18 @@ export const useGonzacarsStore = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
 
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo');
+    if (demo === 'true') {
+      setIsDemoMode(true);
+      setSheetsUrl('DEMO_MODE_ENABLED');
+      // Load mock data for demo
+      loadDemoData();
+    }
+
     const configUrl = params.get('config_db');
     if (configUrl) {
       const decoded = decodeURIComponent(configUrl);
@@ -41,13 +51,59 @@ export const useGonzacarsStore = () => {
     }
   }, []);
 
+  const loadDemoData = () => {
+    // Mock Data
+    setUsers([
+      { id: 'demo-admin', username: 'admin', password: '123', name: 'Admin Demo', role: 'administrador' },
+      { id: 'demo-seller', username: 'vendedor', password: '123', name: 'Vendedor Demo', role: 'vendedor' }
+    ]);
+    setCustomers([
+      { id: 'c1', name: 'Juan Pérez', phone: '0412-1234567', email: 'juan@demo.com', address: 'Calle Falsa 123', createdAt: new Date().toISOString() },
+      { id: 'c2', name: 'Maria Rodriguez', phone: '0414-9876543', email: 'maria@demo.com', address: 'Av. Bolivar', createdAt: new Date().toISOString() }
+    ]);
+    setInventory([
+      { id: 'p1', name: 'Aceite 20W50', barcode: '1001', category: 'Lubricantes', quantity: 50, cost: 5, price: 12 },
+      { id: 'p2', name: 'Filtro de Aceite', barcode: '1002', category: 'Filtros', quantity: 30, cost: 3, price: 8 },
+      { id: 'p3', name: 'Bujía NGK', barcode: '1003', category: 'Encendido', quantity: 100, cost: 2, price: 5 }
+    ]);
+    setRepairs([
+      { 
+        id: 'r1', customerId: 'c1', plate: 'ABC-123', brand: 'Toyota', model: 'Corolla', year: 2015, 
+        description: 'Cambio de Aceite', status: 'En Proceso', 
+        items: [{ id: 'p1', name: 'Aceite 20W50', price: 12, quantity: 4, productId: 'p1' }], 
+        laborCost: 20, total: 68, installments: [], createdAt: new Date().toISOString(), mechanicId: 'demo-mechanic'
+      }
+    ]);
+    setSales([
+      { id: 's1', customerId: 'c2', date: new Date().toISOString(), items: [{ id: 'p3', name: 'Bujía NGK', price: 5, quantity: 4, productId: 'p3' }], total: 20, paymentMethod: 'Efectivo' }
+    ]);
+    setExchangeRate(45.5);
+  };
+
   const saveUrl = (url: string) => {
+    if (isDemoMode) return;
     const cleanUrl = url.trim();
     localStorage.setItem('gz_sheets_url', cleanUrl);
     setSheetsUrl(cleanUrl);
   };
 
   const login = (username: string, pass: string): boolean => {
+    if (isDemoMode) {
+      // In demo mode, allow admin/admin or use the mock users
+      if (username === 'admin' && pass === 'admin') {
+         const demoAdmin: User = { id: 'demo-admin', username: 'admin', name: 'Admin Demo', role: 'administrador' };
+         setCurrentUser(demoAdmin);
+         return true;
+      }
+      const found = users.find(u => u.username === username && u.password === pass);
+      if (found) {
+        const { password, ...userWithoutPass } = found;
+        setCurrentUser(userWithoutPass as User);
+        return true;
+      }
+      return false;
+    }
+
     const found = users.find(u => 
       u.username && 
       u.username.toLowerCase() === username.toLowerCase() && 
@@ -79,6 +135,9 @@ export const useGonzacarsStore = () => {
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('gz_active_user');
+    if (isDemoMode) {
+      // Optional: Reset demo data or keep it? Keeping it is fine for session.
+    }
   };
 
   // --- HELPER FUNCTIONS ---
@@ -122,6 +181,7 @@ export const useGonzacarsStore = () => {
   };
 
   const refreshData = async () => {
+    if (isDemoMode) return; // Don't fetch in demo mode
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     if (isProcessingBatch) return;
 
@@ -242,6 +302,10 @@ export const useGonzacarsStore = () => {
 
   // SYNC CON RETRIES Y BACKOFF EXPONENCIAL
   const syncRow = async (sheet: string, action: 'add' | 'update' | 'delete' | 'batch_purchase' | 'audit_inventory', data: any, retries = 3) => {
+    if (isDemoMode) {
+      console.log(`[DEMO MODE] Sync skipped for ${sheet} - ${action}`, data);
+      return true;
+    }
     if (!sheetsUrl || !sheetsUrl.startsWith('http')) return;
     
     for (let i = 0; i < retries; i++) {
@@ -476,6 +540,7 @@ export const useGonzacarsStore = () => {
     expenses, setExpenses, addExpense,
     employees, setEmployees, addEmployee, updateEmployee, deleteEmployee,
     payroll, setPayroll, addPayrollRecord,
-    runGlobalAudit // Export new audit function
+    runGlobalAudit, // Export new audit function
+    isDemoMode // Export demo mode flag
   };
 };

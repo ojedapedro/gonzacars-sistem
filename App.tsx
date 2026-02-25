@@ -121,7 +121,7 @@ const App: React.FC = () => {
     alert("¡Enlace de configuración copiado! Envíalo a tu otro dispositivo para abrir la app con tus datos.");
   };
 
-  if (!store.sheetsUrl) {
+  if (!store.sheetsUrl && !store.isDemoMode) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-900 p-4 lg:p-6 overflow-y-auto">
         <div className="w-full max-w-2xl bg-white/5 backdrop-blur-2xl rounded-[2rem] lg:rounded-[3rem] border border-white/10 p-6 lg:p-12 text-white animate-in zoom-in duration-500 my-auto">
@@ -189,6 +189,12 @@ const App: React.FC = () => {
             </div>
             <h1 className="text-2xl lg:text-3xl font-black text-white uppercase tracking-tighter">Gonzacars C.A.</h1>
             <p className="text-slate-400 font-bold uppercase text-[9px] lg:text-[10px] tracking-[0.2em] mt-2">Sistema de Gestión Integral</p>
+            {store.isDemoMode && (
+              <div className="mt-4 bg-orange-500/20 text-orange-400 px-4 py-2 rounded-xl border border-orange-500/30">
+                <p className="text-[10px] font-black uppercase tracking-widest">Modo Demostración Activo</p>
+                <p className="text-[9px] mt-1 opacity-80">Usa usuario: <b>admin</b> / clave: <b>admin</b></p>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4 lg:space-y-6">
@@ -442,6 +448,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans relative">
+      {/* Demo Mode Banner */}
+      {store.isDemoMode && (
+        <div className="bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest text-center py-1 absolute top-0 left-0 w-full z-[60]">
+          Modo Demostración - Los datos no se guardarán
+        </div>
+      )}
+
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div 
